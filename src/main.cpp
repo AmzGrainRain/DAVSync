@@ -1,19 +1,20 @@
 #include <cinatra/coro_http_server.hpp>
 #include <pugixml.hpp>
+#include <string_view>
 
 #include "cinatra/coro_http_request.hpp"
 #include "cinatra/coro_http_response.hpp"
 
 #include "config_reader/config_reader.h"
+#include "middleware/basic_authentication.h"
 #include "middleware/digest_authentication.h"
-#include "webdav.hpp"
+#include "routes/webdav.h"
 
 using namespace cinatra;
 
-
 int main()
 {
-    ConfigReader conf{};
+    const auto& conf = ConfigReader::GetInstance();
     coro_http_server app{conf.GetHttpMaxThread(), conf.GetHttpPort(), conf.GetHttpHost()};
 
     // Hello World
@@ -22,14 +23,27 @@ int main()
         res.set_status_and_content(status_type::ok, "<h1>Hello World</h1>");
     });
 
-    // TODO: DAV Services
-    app.set_http_handler<PROPFIND>("/webdav", Route::WebDav::PROPFIND, Middleware::DigestAuthentication{});
-    app.set_http_handler<PROPPATCH>("/webdav", Route::WebDav::PROPPATCH, Middleware::DigestAuthentication{});
-    app.set_http_handler<MKCOL>("/webdav", Route::WebDav::MKCOL, Middleware::DigestAuthentication{});
-    app.set_http_handler<COPY>("/webdav", Route::WebDav::COPY, Middleware::DigestAuthentication{});
-    app.set_http_handler<MOVE>("/webdav", Route::WebDav::MOVE, Middleware::DigestAuthentication{});
-    app.set_http_handler<LOCK>("/webdav", Route::WebDav::LOCK, Middleware::DigestAuthentication{});
-    app.set_http_handler<UNLOCK>("/webdav", Route::WebDav::UNLOCK, Middleware::DigestAuthentication{});
+    const std::string_view dav_auto_type = conf.GetWebDavVerification();
+    std::string WebDAVPrefix = conf.GetWebDavPrefix();
+
+    app.set_http_handler<HEAD, OPTIONS, GET, PUT, DEL, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK>(
+            WebDAVPrefix, Routes::WebDAV::MainHandler, Middleware::DigestAuthentication{});
+
+    // if (dav_auto_type == "Basic")
+    // {
+    //     app.set_http_handler<HEAD, OPTIONS, GET, PUT, DEL, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK>(
+    //         WebDAVPrefix, Routes::WebDAV::MainHandler, Middleware::BasicAuthentication{});
+    // }
+    // else if (dav_auto_type == "Digest")
+    // {
+    //     app.set_http_handler<HEAD, OPTIONS, GET, PUT, DEL, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK>(
+    //         WebDAVPrefix, Routes::WebDAV::MainHandler, Middleware::DigestAuthentication{});
+    // }
+    // else
+    // {
+    //     app.set_http_handler<HEAD, OPTIONS, GET, PUT, DEL, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK>(
+    //         WebDAVPrefix, Routes::WebDAV::MainHandler);
+    // }
 
     return app.sync_start().value();
 }

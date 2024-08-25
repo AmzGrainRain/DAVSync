@@ -7,20 +7,23 @@ file(GLOB_RECURSE SOURCE_LIST
     ${PROJECT_SOURCE_DIR}/*.hpp
     ${PROJECT_SOURCE_DIR}/*.cpp
 )
+
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME} PUBLIC
-	inih::static
-	pugixml::static
+    cinatra::static
+    inih::static
+    pugixml::static
+    picosha2::static
 )
-target_compile_options(${PROJECT_NAME} PRIVATE -Wall)
 
-# for cinatra
-include(cmake/cinatra.cmake)
-
-# for tests
+# generate static library
 add_library(${PROJECT_NAME}-static STATIC ${SOURCE_LIST})
+target_include_directories(${PROJECT_NAME}-static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME}-static PUBLIC
+    cinatra-static
 	inih::static
 	pugixml::static
+    picosha2::static
 )
 add_library(${PROJECT_NAME}::static ALIAS ${PROJECT_NAME}-static)

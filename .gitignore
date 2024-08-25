@@ -1,5 +1,8 @@
-build
 .cache
+.vs
+build
+out
 external/cinatra
 external/inih
+external/PicoSHA2
 external/pugixml

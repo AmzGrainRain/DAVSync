@@ -1,15 +1,21 @@
+#include "config_reader.h"
+#include <inih/cpp/INIReader.h>
 #include <cstdint>
 #include <thread>
 #include <exception>
 
-#include "inih/cpp/INIReader.h"
+#include "utils/string_utils.h"
 
-#include "config_reader.h"
-#include "../utils.h"
+const ConfigReader& ConfigReader::GetInstance()
+{
+    static ConfigReader instance;
+
+    return instance;
+}
 
 ConfigReader::ConfigReader(const std::filesystem::path& path)
 {
-    std::string path_string = path2str(path);
+    std::string path_string = utils::string::path2str(path);
     INIReader reader(path_string);
     if (reader.ParseError() < 0)
     {
@@ -20,11 +26,16 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
     // http
     http_host_ = reader.GetString("http", "address", "0.0.0.0");
     http_port_ = static_cast<uint16_t>(reader.GetInteger("http", "port", 8111));
-    http_max_thread_ = static_cast<short>(reader.GetInteger("http", "max_thread", std::thread::hardware_concurrency()));
+    http_max_thread_ = static_cast<uint8_t>(reader.GetInteger("http", "max_thread", std::thread::hardware_concurrency()));
     if (http_max_thread_ <= 0)
     {
-        http_max_thread_ = std::thread::hardware_concurrency();
+        http_max_thread_ = static_cast<uint8_t>(std::thread::hardware_concurrency());
     }
+
+    // webdav
+    webdav_prefix_ = reader.GetString("webdav", "prefix", "/webdav");
+    webdav_verification_ = reader.GetString("wevdav", "verification", "Digest");
+    webdav_realm_ = reader.GetString("webdav", "realm", "WebDavRealm");
 
     // redis
     redis_host_ = reader.GetString("redis", "host", "localhost");
@@ -53,6 +64,21 @@ uint16_t ConfigReader::GetHttpPort() const noexcept
 uint8_t ConfigReader::GetHttpMaxThread() const noexcept
 {
     return http_max_thread_;
+}
+
+const std::string& ConfigReader::GetWebDavPrefix() const noexcept
+{
+    return webdav_prefix_;
+}
+
+const std::string& ConfigReader::GetWebDavVerification() const noexcept
+{
+    return webdav_verification_;
+}
+
+const std::string& ConfigReader::GetWebDavRealm() const noexcept
+{
+    return webdav_realm_;
 }
 
 const std::string& ConfigReader::GetRedisHost() const noexcept

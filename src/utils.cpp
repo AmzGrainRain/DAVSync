@@ -2,18 +2,15 @@
 #include <cstdint>
 #include <random>
 #include <string>
+#include <string_view>
+#include <vector>
+
+#include <PicoSHA2/picosha2.h>
 
 #include "utils.h"
 
-std::string u8str2str(const std::u8string& u8str)
+namespace utils
 {
-    return std::string{u8str.begin(), u8str.end()};
-}
-
-std::string path2str(const std::filesystem::path& path)
-{
-    return u8str2str(path.u8string());
-}
 
 int64_t get_timestamp_ns()
 {
@@ -33,3 +30,13 @@ std::string generate_unique_key()
 
     return std::to_string(timestamp_ns) + std::to_string(random_part);
 }
+
+std::string sha256(const std::string& text)
+{
+    std::vector<unsigned char> hash(picosha2::k_digest_size);
+    picosha2::hash256(text.begin(), text.end(), hash.begin(), hash.end());
+
+    return picosha2::bytes_to_hex_string(hash.begin(), hash.end());
+}
+
+} // namespace utils
