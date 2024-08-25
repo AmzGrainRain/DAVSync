@@ -65,12 +65,12 @@ add_library(cinatra::static ALIAS cinatra-static)
 
 if (ENABLE_SSL)
 	find_package(OpenSSL)
-	target_link_libraries(cinatra-static INTERFACE ${OPENSSL_LIBRARIES} pthread -ldl)
+	target_link_libraries(cinatra-static INTERFACE ${OPENSSL_LIBRARIES})
 endif()
 
 if (ENABLE_CLIENT_SSL)
 	find_package(OpenSSL)
-	target_link_libraries(cinatra-static INTERFACE ${OPENSSL_LIBRARIES} pthread -ldl)
+	target_link_libraries(cinatra-static INTERFACE ${OPENSSL_LIBRARIES})
 endif()
 
 if (ENABLE_GZIP)

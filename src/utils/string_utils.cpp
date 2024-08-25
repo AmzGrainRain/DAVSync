@@ -45,16 +45,23 @@ void trim(std::string& str)
 std::vector<std::string> split(const std::string& str, const std::string_view& separator)
 {
     std::vector<std::string> tokens;
-
-    size_t pos = str.find(separator);
-    while (pos != std::string::npos)
+    size_t str_len = str.length();
+    size_t last_pos = 0, pos;
+    while ((pos = str.find(separator, last_pos)) != std::string::npos)
     {
-        std::string value = str.substr(pos, separator.size());
-        trim(value);
-        tokens.push_back(std::move(value));
+        tokens.emplace_back(str.substr(last_pos, pos - last_pos));
+        last_pos = pos + 1;
+        if (last_pos >= str_len)
+        {
+            break;
+        }
     }
 
-    tokens.push_back(str.substr(pos));
+    if (last_pos < str_len)
+    {
+        tokens.emplace_back(str.substr(last_pos));
+    }
+
     return tokens;
 }
 
@@ -67,7 +74,11 @@ auto split2pair(const std::string& str,
         return std::nullopt;
     }
 
-    return std::pair<std::string, std::string>{str.substr(0, pos), str.substr(pos + 1)};
+    std::string k = str.substr(0, pos);
+    std::string v = str.substr(pos + 1);
+    trim(k);
+    trim(v);
+    return std::pair{std::move(k), std::move(v)};
 }
 
 } // namespace utils::string

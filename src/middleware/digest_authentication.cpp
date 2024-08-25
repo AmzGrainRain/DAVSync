@@ -77,14 +77,14 @@ bool DigestAuthentication::before(coro_http_request& req, coro_http_response& re
             return false;
         }
 
-        const std::string HA1 = ComputeHA1(map.find("username")->second);
-        const std::string HA2 = ComputeHA2(req.get_method(), req.get_url());
-
         auto username = map.find("username");
         auto nonce = map.find("nonce");
         auto nc = map.find("nc");
         auto conce = map.find("conce");
         auto qop = map.find("qop");
+
+        const std::string HA1 = ComputeHA1(username->second);
+        const std::string HA2 = ComputeHA2(req.get_method(), req.get_url());
         // HA1:nonce:nc:conce:qop:HA2
         const std::string RESPONSE = utils::sha256(
             std::format("{}:{}:{}:{}:{}:{}", HA1, nonce->second, nc->second, conce->second, qop->second, HA2));
