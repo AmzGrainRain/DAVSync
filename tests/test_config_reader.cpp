@@ -2,14 +2,13 @@
 #include <cassert>
 #include <iostream>
 #include <ostream>
-
-#include "config_reader/config_reader.h"
+#include "config_reader.h"
 
 int main(int argc, const char* argv[])
 {
     try
     {
-        ConfigReader config;
+        const auto& conf = ConfigReader::GetInstance();
 
         // std::cout << config.GetHttpHost() << std::endl;
         // std::cout << config.GetHttpPort() << std::endl;

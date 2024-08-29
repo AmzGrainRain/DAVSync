@@ -1,16 +1,17 @@
 cmake_minimum_required(VERSION 3.6)
 
 project(DavSYNC LANGUAGES C CXX)
-
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_BUILD_TYPE Debug)
 
 add_definitions(
-	-D_SCL_SECURE_NO_WARNINGS
-	-D_CRT_SECURE_NO_WARNINGS
-	-D_WIN32_WINNT=0x0A00
+    -D_SCL_SECURE_NO_WARNINGS
+    -D_CRT_SECURE_NO_WARNINGS
 )
+if(WIN32)
+    add_definitions(-D_WIN32_WINNT=0x0A00)
+endif()
 
 # external
 include_directories(external)
@@ -26,28 +27,10 @@ add_subdirectory(src)
 enable_testing()
 add_subdirectory(tests)
 
-# warning control
-file(GLOB_RECURSE SOURCE_LIST
-    src/*.h
-    src/*.hpp
-    src/*.cxx
-    src/*.cpp
-)
-
-file(GLOB_RECURSE EXTERNAL_SOURCE_LIST
-    external/*.h
-    external/*.ipp
-    external/*.hpp
-    external/*.c
-    external/*.cc
-    external/*.cxx
-    external/*.cpp
-)
-
-if (MSVC)
-    set_source_files_properties(${SOURCE_LIST} PROPERTIES COMPILE_FLAGS "/W4 /WX")
-    set_source_files_properties(${EXTERNAL_SOURCE_LIST} PROPERTIES COMPILE_FLAGS "/w")
-else()
-    set_source_files_properties(${SOURCE_LIST} PROPERTIES COMPILE_FLAGS "-Wall -Wextra -Werror")
-    set_source_files_properties(${EXTERNAL_SOURCE_LIST} PROPERTIES COMPILE_FLAGS "-w")
-endif()
+message(STATUS "========================== server config ===========================")
+message(STATUS "CXX Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+message(STATUS "Build: ${CMAKE_BUILD_TYPE}")
+message(STATUS "====================================================================")
+message(STATUS "")

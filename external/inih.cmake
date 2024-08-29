@@ -6,5 +6,6 @@ file(GLOB_RECURSE inih_SOURCE_LIST
 )
 
 add_library(inih-static STATIC ${inih_SOURCE_LIST})
+set_target_properties(inih-static PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:inih-static,INTERFACE_INCLUDE_DIRECTORIES>)
 target_compile_definitions(inih-static PRIVATE INI_ALLOW_MULTILINE=0)
 add_library(inih::static ALIAS inih-static)

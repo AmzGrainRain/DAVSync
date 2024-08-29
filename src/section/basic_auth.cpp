@@ -1,14 +1,14 @@
-#include "basic_authentication.h"
+#include "basic_auth.h"
 
 #include <format>
 #include <vector>
 
 #include <cinatra/utils.hpp>
 
-#include "config_reader/config_reader.h"
-#include "utils/string_utils.h"
+#include "config_reader.h"
+#include "utils/string.h"
 
-inline static void RequestVerification(coro_http_response& res)
+inline static void RequestVerification(cinatra::coro_http_response& res) noexcept
 {
     const auto& conf = ConfigReader::GetInstance();
 
@@ -17,16 +17,16 @@ inline static void RequestVerification(coro_http_response& res)
     res.set_status(cinatra::status_type::unauthorized);
 }
 
-inline static std::string ParseAuthorization(const std::string_view& text_view)
+inline static std::string ParseAuthorization(const std::string_view& text_view) noexcept
 {
     std::string text{text_view};
     return utils::string::split(text, " ")[1];
 }
 
-namespace Middleware
+namespace Section
 {
 
-bool BasicAuthentication::before(coro_http_request& req, coro_http_response& res)
+bool BasicAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     try
     {
@@ -34,6 +34,12 @@ bool BasicAuthentication::before(coro_http_request& req, coro_http_response& res
         if (authorization.empty())
         {
             RequestVerification(res);
+            return false;
+        }
+
+        if (!authorization.starts_with("Basic "))
+        {
+            res.set_status(cinatra::status_type::forbidden);
             return false;
         }
 
@@ -51,16 +57,16 @@ bool BasicAuthentication::before(coro_http_request& req, coro_http_response& res
     catch (const std::exception& err)
     {
         std::cout << std::format("[{}:{}] {}", __FILE__, __LINE__, err.what());
-        res.set_status(cinatra::status_type::internal_server_error);
+        res.set_status(cinatra::status_type::bad_request);
         return false;
     }
 
     return true;
 }
 
-bool BasicAuthentication::after(coro_http_request& req, coro_http_response& res)
+bool BasicAuth::after(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     return true;
 }
 
-} // namespace Middleware
+} // namespace Section

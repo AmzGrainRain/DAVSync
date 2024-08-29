@@ -1,16 +1,16 @@
-#include "digest_authentication.h"
+#include "digest_auth.h"
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include "config_reader/config_reader.h"
+#include "config_reader.h"
 #include "utils.h"
-#include "utils/map_utils.hpp"
-#include "utils/string_utils.h"
+#include "utils/map.hpp"
+#include "utils/string.h"
 
-inline static void RequestVerification(coro_http_response& res)
+inline static void RequestVerification(cinatra::coro_http_response& res) noexcept
 {
     const auto& conf = ConfigReader::GetInstance();
 
@@ -21,7 +21,7 @@ inline static void RequestVerification(coro_http_response& res)
     res.set_status(cinatra::status_type::unauthorized);
 }
 
-inline static auto ParseAuthorizationHeader(const std::string_view& text_view)
+inline static auto ParseAuthorizationHeader(const std::string_view& text_view) noexcept
     -> std::unordered_map<std::string, std::string>
 {
     std::unordered_map<std::string, std::string> map{};
@@ -44,22 +44,22 @@ inline static auto ParseAuthorizationHeader(const std::string_view& text_view)
 }
 
 // username:realm:password
-inline static std::string ComputeHA1(const std::string& username)
+inline static std::string ComputeHA1(const std::string& username) noexcept
 {
     const auto& conf = ConfigReader::GetInstance();
     return utils::sha256(std::format("{}:{}:{}", conf.GetUserAccount(), conf.GetWebDavRealm(), conf.GetUserPassword()));
 }
 
 // method:uri
-inline static std::string ComputeHA2(const std::string_view& method, const std::string_view& uri)
+inline static std::string ComputeHA2(const std::string_view& method, const std::string_view& uri) noexcept
 {
     return utils::sha256(std::format("{}:{}", method, uri));
 }
 
-namespace Middleware
+namespace Section
 {
 
-bool DigestAuthentication::before(coro_http_request& req, coro_http_response& res)
+bool DigestAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     try
     {
@@ -67,6 +67,12 @@ bool DigestAuthentication::before(coro_http_request& req, coro_http_response& re
         if (authorization.empty())
         {
             RequestVerification(res);
+            return false;
+        }
+
+        if (!authorization.starts_with("Digest "))
+        {
+            res.set_status(cinatra::status_type::forbidden);
             return false;
         }
 
@@ -88,7 +94,6 @@ bool DigestAuthentication::before(coro_http_request& req, coro_http_response& re
         // HA1:nonce:nc:conce:qop:HA2
         const std::string RESPONSE = utils::sha256(
             std::format("{}:{}:{}:{}:{}:{}", HA1, nonce->second, nc->second, conce->second, qop->second, HA2));
-
         if (map.find("response")->second != RESPONSE)
         {
             RequestVerification(res);
@@ -98,16 +103,16 @@ bool DigestAuthentication::before(coro_http_request& req, coro_http_response& re
     catch (const std::exception& err)
     {
         std::cout << std::format("[{}:{}] {}", __FILE__, __LINE__, err.what());
-        res.set_status(cinatra::status_type::internal_server_error);
+        res.set_status(cinatra::status_type::bad_request);
         return false;
     }
 
     return true;
 }
 
-bool DigestAuthentication::after(coro_http_request& req, coro_http_response& res)
+bool DigestAuth::after(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     return true;
 }
 
-} // namespace Middleware
+} // namespace Section

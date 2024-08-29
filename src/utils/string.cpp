@@ -1,4 +1,4 @@
-#include "string_utils.h"
+#include "string.h"
 
 namespace utils::string
 {
@@ -6,11 +6,6 @@ namespace utils::string
 std::string u8str2str(const std::u8string& u8str)
 {
     return std::string{u8str.begin(), u8str.end()};
-}
-
-std::string path2str(const std::filesystem::path& path)
-{
-    return u8str2str(path.u8string());
 }
 
 void replace(std::string& str, const std::string& search, const std::string_view& replace_with)

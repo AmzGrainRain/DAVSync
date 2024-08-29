@@ -17,13 +17,10 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     picosha2::static
 )
 
-# generate static library
-add_library(${PROJECT_NAME}-static STATIC ${SOURCE_LIST})
-target_include_directories(${PROJECT_NAME}-static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(${PROJECT_NAME}-static PUBLIC
-    cinatra-static
-	inih::static
-	pugixml::static
-    picosha2::static
-)
-add_library(${PROJECT_NAME}::static ALIAS ${PROJECT_NAME}-static)
+if(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
+    target_compile_options(${PROJECT_NAME} INTERFACE "/W4 /WX /experimental:module")
+elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+    target_compile_options(${PROJECT_NAME} INTERFACE "-Wall -Wextra -Werror -fmodules-ts")
+elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    target_compile_options(${PROJECT_NAME} INTERFACE "-Wall -Wextra -Werror -fmodules-ts")
+endif()

@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <random>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include <PicoSHA2/picosha2.h>
