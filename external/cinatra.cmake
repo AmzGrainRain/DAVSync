@@ -61,6 +61,14 @@ if(ENABLE_SANITIZER AND NOT MSVC)
     endif()
 endif()
 
+find_package(Threads REQUIRED)
+
+# library properties
+add_library(cinatra-static INTERFACE)
+target_include_directories(cinatra-static SYSTEM INTERFACE ${CMAKE_SOURCE_DIR}/external/cinatra/include)
+
+add_library(cinatra::static ALIAS cinatra-static)
+
 # simd
 message(STATUS "Enable simd: ${ENABLE_SIMD}")
 if (ENABLE_SIMD STREQUAL "AARCH64")
@@ -92,15 +100,7 @@ elseif (ENABLE_SIMD STREQUAL "AVX2")
 	endif ()
 endif ()
 
-
-find_package(Threads REQUIRED)
-
-# library properties
-add_library(cinatra-static INTERFACE)
-target_include_directories(cinatra-static SYSTEM INTERFACE ${CMAKE_SOURCE_DIR}/external/cinatra/include)
-
-add_library(cinatra::static ALIAS cinatra-static)
-
+# fatures
 message(STATUS "Enable OpenSSL: ${ENABLE_SSL}")
 if (ENABLE_SSL)
 	find_package(OpenSSL REQUIRED)
