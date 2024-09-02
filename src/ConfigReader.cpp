@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -189,7 +190,12 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
     // =======================================================================================
 
     /* check for database conflicts */
-    if (sqlite_enable_ == redis_enable_)
+    if (!sqlite_enable_ && !redis_enable_)
+    {
+        std::cerr << "It seems that you have disabled both SQLite and Redis, SQLite will be prioritized here." << std::endl;
+        sqlite_enable_ = true;
+    }
+    else if (sqlite_enable_ && redis_enable_)
     {
         sqlite_enable_ = false;
         std::cerr << "It seems that you have enabled both SQLite and Redis, Redis will be prioritized here." << std::endl;

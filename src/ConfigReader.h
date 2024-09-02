@@ -69,13 +69,6 @@ class ConfigReader
     bool sqlite_enable_;
     std::filesystem::path sqlite_location_;
 
-    bool pgsql_enable_;
-    std::string pgsql_host_;
-    uint16_t pgsql_port_;
-    std::string pgsql_database_;
-    std::string pgsql_user_;
-    std::string pgsql_password_;
-
     bool redis_enable_;
     std::string redis_host_;
     uint16_t redis_port_;
