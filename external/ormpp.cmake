@@ -1,0 +1,17 @@
+add_library(ormpp-static INTERFACE)
+add_library(ormpp::static ALIAS ormpp-static)
+target_include_directories(ormpp-static SYSTEM INTERFACE ${CMAKE_SOURCE_DIR}/external/ormpp/ormpp)
+target_include_directories(ormpp-static SYSTEM PUBLIC ${PGSQL_INCLUDE_DIR})
+
+find_package(libpqxx CONFIG REQUIRED)
+target_link_libraries(ormpp-static INTERFACE libpqxx::pqxx)
+
+if (WIN32)
+    if (MSVC)
+        target_compile_options(ormpp-static INTERFACE /std:c++latest)
+    else()
+        target_compile_options(ormpp-static INTERFACE -pthread -ldl -std=c++23)
+    endif()
+else()
+    target_compile_options(ormpp-static INTERFACE -pthread -ldl -std=c++23)
+endif()

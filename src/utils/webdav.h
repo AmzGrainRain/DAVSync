@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
 #include <filesystem>
+#include <optional>
 #include <stack>
 #include <string_view>
 
@@ -19,5 +21,7 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std:
 void generate_response_list_recurse(pugi::xml_node& multistatus, const std::filesystem::path& path, int8_t depth);
 
 std::filesystem::path uri_to_absolute(const std::string_view& uri);
+
+std::optional<std::string> compute_etag(const std::filesystem::path& file_path);
 
 } // namespace utils::webdav

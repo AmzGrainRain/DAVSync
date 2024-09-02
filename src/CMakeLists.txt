@@ -8,14 +8,19 @@ file(GLOB_RECURSE SOURCE_LIST
     ${PROJECT_SOURCE_DIR}/*.cpp
 )
 
+find_package(libpqxx CONFIG REQUIRED)
+
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME} PUBLIC
     cinatra::static
     inih::static
+    # ormpp::static
     pugixml::static
     picosha2::static
 )
+
+target_link_libraries(${PROJECT_NAME} PRIVATE libpqxx::pqxx)
 
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")
     target_compile_options(${PROJECT_NAME} INTERFACE "/W4 /WX /experimental:module")

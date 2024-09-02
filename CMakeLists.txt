@@ -16,6 +16,7 @@ endif()
 # external
 include_directories(external)
 include(external/inih.cmake)
+include(external/ormpp.cmake)
 include(external/cinatra.cmake)
 include(external/pugixml.cmake)
 include(external/picosha2.cmake)

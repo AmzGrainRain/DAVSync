@@ -1,11 +1,10 @@
-#include "basic_auth.h"
+#include "BasicAuth.h"
 
 #include <format>
 #include <vector>
 
 #include <cinatra/utils.hpp>
-
-#include "config_reader.h"
+#include "ConfigReader.h"
 #include "utils/string.h"
 
 inline static void RequestVerification(cinatra::coro_http_response& res) noexcept

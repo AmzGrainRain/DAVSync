@@ -4,27 +4,16 @@
 #include <filesystem>
 #include <stack>
 #include <utility>
+#include <format>
+#include <chrono>
+#include <mutex>
 
-#include "config_reader.h"
-
+#include <PicoSHA2/picosha2.h>
+#include "ConfigReader.h"
 #include "path.h"
 #include "utils/path.h"
 
-/*
-<?xml version="1.0" encoding="utf-8"?>
-<D:multistatus xmlns:D="DAV:">
-  <D:response>
-    <D:href>/path/to/file</D:href>
-    <D:propstat>
-      <D:prop>
-        <D:getcontenttype>application/octet-stream</D:getcontenttype>
-        <D:getcontentlength>12345</D:getcontentlength>
-      </D:prop>
-      <D:status>HTTP/1.1 200 OK</D:status>
-    </D:propstat>
-  </D:response>
-</D:multistatus>
-*/
+std::mutex Mutex_Routes_WebDAV_IMPL_ComputeETag;
 
 namespace utils::webdav
 {
@@ -147,6 +136,21 @@ std::filesystem::path uri_to_absolute(const std::string_view& uri)
     uri_str.insert(uri_str.begin(), '.');
 
     return (conf.GetWebDavAbsoluteDataPath() / uri_str).lexically_normal();
+}
+
+std::optional<std::string> compute_etag(const std::filesystem::path& file_path)
+{
+    std::lock_guard<std::mutex> LOCK(Mutex_Routes_WebDAV_IMPL_ComputeETag);
+
+    std::ifstream ifs(file_path, std::ios::binary);
+    if (!ifs.is_open())
+    {
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> buffer(picosha2::k_digest_size);
+    picosha2::hash256(ifs, buffer.begin(), buffer.end());
+    return picosha2::bytes_to_hex_string(buffer.begin(), buffer.end());
 }
 
 } // namespace utils::webdav

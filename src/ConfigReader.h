@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <string>
 
@@ -26,13 +27,17 @@ class ConfigReader
     const std::filesystem::path& GetSSLKeyPath() const noexcept;
 
     const std::string& GetWebDavPrefix() const noexcept;
-    const std::string& GetWebDavRawPrefix() const noexcept;
+    const std::string& GetWebDavRoutePrefix() const noexcept;
     const std::filesystem::path& GetWebDavRelativeDataPath() const noexcept;
     const std::filesystem::path& GetWebDavAbsoluteDataPath() const noexcept;
     const std::string& GetWebDavVerification() const noexcept;
     const std::string& GetWebDavRealm() const noexcept;
     int8_t GetWebDavMaxRecurseDepth() const noexcept;
 
+    bool GetSQLiteEnable() const noexcept;
+    const std::filesystem::path& GetSQLiteLocation() const noexcept;
+
+    bool GetRedisEnable() const noexcept;
     const std::string& GetRedisHost() const noexcept;
     uint16_t GetRedisPort() const noexcept;
     const std::string& GetRedisAuth() const noexcept;
@@ -45,7 +50,7 @@ class ConfigReader
 
     std::string http_host_;
     std::string http_address_;
-    short http_port_;
+    uint16_t http_port_;
     uint16_t http_max_thread_;
     size_t http_buffer_size_;
 
@@ -54,15 +59,26 @@ class ConfigReader
     std::filesystem::path ssl_key_path_;
 
     std::string webdav_prefix_;
-    std::string webdav_raw_prefix_;
+    std::string webdav_route_prefix_;
     std::filesystem::path webdav_relative_data_path_;
     std::filesystem::path webdav_absolute_data_path_;
     std::string webdav_verification_;
     std::string webdav_realm_;
     int8_t webdav_max_recurse_depth_;
 
+    bool sqlite_enable_;
+    std::filesystem::path sqlite_location_;
+
+    bool pgsql_enable_;
+    std::string pgsql_host_;
+    uint16_t pgsql_port_;
+    std::string pgsql_database_;
+    std::string pgsql_user_;
+    std::string pgsql_password_;
+
+    bool redis_enable_;
     std::string redis_host_;
-    short redis_port_;
+    uint16_t redis_port_;
     std::string redis_auth_;
 
     std::string user_account_;

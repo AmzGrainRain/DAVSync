@@ -10,3 +10,6 @@
 [submodule "external/PicoSHA2"]
 	path = external/PicoSHA2
 	url = https://github.com/okdshin/PicoSHA2.git
+[submodule "external/ormpp"]
+	path = external/ormpp
+	url = https://github.com/qicosmos/ormpp.git

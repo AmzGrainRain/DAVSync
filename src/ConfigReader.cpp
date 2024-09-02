@@ -1,15 +1,13 @@
 #include <cassert>
 #include <cstdint>
-#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <thread>
-#include <variant>
+#include <utility>
 
 #include <inih/cpp/INIReader.h>
-
-#include "config_reader.h"
+#include "ConfigReader.h"
 #include "utils/path.h"
 
 inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::path& file)
@@ -29,28 +27,33 @@ inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::pa
                                        "address = 0.0.0.0\n"
                                        "port = 8111\n"
                                        "buffer_size = 1024\n"
-                                       "max_thread = 0\n"
+                                       "max_thread = 0\n\n"
 
                                        "[ssl]\n"
                                        "enable = false\n"
                                        "cert =./full_chain.pem\n"
-                                       "key =./key.pem\n"
+                                       "key =./key.pem\n\n"
 
                                        "[webdav]\n"
                                        "prefix = /webdav\n"
                                        "root-path = ./data\n"
                                        "verification = none\n"
                                        "realm = WebDavRealm\n"
-                                       "max-recurse-depth = 4\n"
+                                       "max-recurse-depth = 4\n\n"
+
+                                       "[sqlite]\n"
+                                       "enable = true\n"
+                                       "location = ./file_props.db\n\n"
 
                                        "[redis]\n"
+                                       "enable = false\n"
                                        "host = localhost\n"
                                        "port = 6379\n"
-                                       "auth = \n"
+                                       "auth = \n\n"
 
                                        "[user]\n"
                                        "account =\n"
-                                       "password =\n";
+                                       "password =\n\n";
     ofs.write(default_config.data(), default_config.size());
     ofs.flush();
     ofs.close();
@@ -59,120 +62,137 @@ inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::pa
 
 const ConfigReader& ConfigReader::GetInstance()
 {
-    static ConfigReader instance;
-
+    static ConfigReader instance{};
     return instance;
 }
 
 ConfigReader::ConfigReader(const std::filesystem::path& path)
 {
+    namespace fs = std::filesystem;
+
     std::string path_string = utils::path::to_string(path);
-    if (!std::filesystem::exists(path_string))
+    if (!fs::exists(path_string))
     {
         WriteDefaultConfigFile(path);
     }
 
     INIReader reader(path_string);
-    assert(reader.ParseError() == 0 && "failed to parsing settings.ini");
+    assert(reader.ParseError() == 0 && "Failed to parsing settings.ini");
 
-    cwd_ = std::filesystem::current_path();
+    cwd_ = fs::current_path();
 
-    /* HTTP */
+    // === http ==============================================================================
     http_host_ = reader.GetString("http", "host", "127.0.0.1");
-    assert(!http_host_.empty() && "illegal http host");
+    assert(!http_host_.empty() && "[http.host] Illegal host");
 
     http_address_ = reader.GetString("http", "address", "0.0.0.0");
-    assert(!http_address_.empty() && "illegal http address");
+    assert(!http_address_.empty() && "[http.address] Illegal address");
 
     {
         long http_port = reader.GetInteger("http", "port", 8111);
-        assert(std::in_range<uint16_t>(http_port) && "port number out of range");
+        assert(std::in_range<uint16_t>(http_port) && "[http.port] Must be within the range of [0-65535]");
         http_port_ = static_cast<uint16_t>(http_port);
     }
 
+    http_buffer_size_ = static_cast<size_t>(reader.GetUnsigned64("http", "buffer-size", 1024));
+    assert((http_buffer_size_ >= 1024) && "[http.buffer-size] Must be >= 1024");
+
     {
         long http_max_thread = reader.GetInteger("http", "max_thread", 0);
-        assert(std::in_range<uint16_t>(http_max_thread) && "thread number out of range [impossible?]");
+        assert(std::in_range<uint16_t>(http_max_thread) && "[http.max-thread] Must be within the range of [0-65535]");
         http_max_thread_ = static_cast<uint16_t>(http_max_thread);
+        if (http_max_thread_ == 0)
+        {
+            http_max_thread_ = std::thread::hardware_concurrency();
+        }
     }
+    // =======================================================================================
 
-    http_buffer_size_ = static_cast<size_t>(reader.GetUnsigned64("http", "buffer_size", 1024));
-    assert((http_buffer_size_ >= 1024) && "the buffer size shoule be greater than 1024");
-
-    /* SSL */
-    {
-        auto ssl_enable = reader.GetString("ssl", "enable", "no");
-        assert((ssl_enable == "true" || ssl_enable == "false") && "ssl_enable must be one of them [true | false]");
-        ssl_enable_ = ssl_enable == "true" ? true : false;
-    }
+    // === ssl ===============================================================================
+    ssl_enable_ = reader.GetBoolean("ssl", "enable", "false");
     ssl_cert_path_ = reader.GetString("ssl", "cert", "");
     ssl_key_path_ = reader.GetString("ssl", "key", "");
     if (ssl_enable_)
     {
-        assert(std::filesystem::is_regular_file(ssl_cert_path_) && "SSL certificate does not exist");
-        assert(std::filesystem::is_regular_file(ssl_key_path_) && "SSL private key does not exist");
+        assert(std::filesystem::is_regular_file(ssl_cert_path_) && "[ssl.cert] Not exist");
+        assert(std::filesystem::is_regular_file(ssl_key_path_) && "[ssl.key] Not exist");
     }
+    // =======================================================================================
 
-    // webdav
-    webdav_prefix_ = reader.GetString("webdav", "prefix", "/webdav");
-    assert(!webdav_prefix_.empty() && "the webdav prefix cannot be empty");
+    // === webdav ============================================================================
+    webdav_prefix_ = reader.GetString("webdav", "prefix", "./webdav");
+    assert(!webdav_prefix_.empty() && "[webdav.prefix] Cannot be empty");
     {
         char c = webdav_prefix_.back();
-        assert((c >= 65 && c <= 90) || (c >= 97 && c <= 122) && "the prefix should end with the [a-Z] character");
+        assert((c >= 65 && c <= 90) || (c >= 97 && c <= 122) && "[webdav.prefix] Must end with the [a-Z] character");
     }
-    webdav_raw_prefix_ = webdav_prefix_ + "/(.*)";
 
-    std::filesystem::path data_path = reader.GetString("webdav", "root-path", "data");
-    assert((std::filesystem::exists(data_path) && std::filesystem::is_directory(data_path)) &&
-           "webdav root path is not available");
+    webdav_route_prefix_ = webdav_prefix_ + "/(.*)";
 
-    if (data_path.is_absolute())
     {
-        webdav_absolute_data_path_ = std::move(data_path);
-        webdav_relative_data_path_ = std::filesystem::relative(webdav_absolute_data_path_, cwd_).lexically_normal();
-    }
-    else
-    {
-        webdav_relative_data_path_ = std::move(data_path);
-        webdav_absolute_data_path_ = (cwd_ / webdav_relative_data_path_).lexically_normal();
+        fs::path data_path = reader.GetString("webdav", "data-path", "data");
+        assert(std::filesystem::exists(data_path) && "[webdav.data-path] Not exist");
+        assert(std::filesystem::is_directory(data_path) && "[webdav.data-path] Required directory");
+        if (data_path.is_absolute())
+        {
+            webdav_absolute_data_path_ = std::move(data_path);
+            webdav_relative_data_path_ = std::filesystem::relative(webdav_absolute_data_path_, cwd_).lexically_normal();
+        }
+        else
+        {
+            webdav_relative_data_path_ = std::move(data_path);
+            webdav_absolute_data_path_ = (cwd_ / webdav_relative_data_path_).lexically_normal();
+        }
     }
 
     {
         long webdav_max_recurse_depth = reader.GetInteger("webdav", "max-recurse-depth", 4);
         assert(std::in_range<int8_t>(webdav_max_recurse_depth) &&
-               "the maximum recursive depth of webdav exceeds the range");
+               "[webdav.max-recurse-depth] Must be within the range of [0-255]");
         webdav_max_recurse_depth_ = static_cast<int8_t>(webdav_max_recurse_depth);
     }
 
     webdav_verification_ = reader.GetString("wevdav", "verification", "none");
     assert((webdav_verification_ == "basic" || webdav_verification_ == "digest" || webdav_verification_ == "none") &&
-           "webdav verification must be one of them [basic|digest|none]");
+           "[webdav.verification] Must be one of them [basic|digest|none]");
 
     webdav_realm_ = reader.GetString("webdav", "realm", "WebDavRealm");
-    assert(!webdav_realm_.empty() && "the webdav realm cannot be empty");
+    assert(!webdav_realm_.empty() && "[webdav.realm] Cannot be empty");
+    // =======================================================================================
 
-    // redis
+    // === sqlite ============================================================================
+    sqlite_enable_ = reader.GetBoolean("sqlite", "enable", true);
+    sqlite_location_ = reader.GetString("sqlite", "location", "./file_index.db");
+    // =======================================================================================
+
+    // === redis =============================================================================
+    redis_enable_ = reader.GetBoolean("redis", "enable", false);
     redis_host_ = reader.GetString("redis", "host", "localhost");
 
     {
         long redis_port = reader.GetInteger("redis", "port", 6379);
         assert(std::in_range<uint16_t>(redis_port) && "redis port number out of range");
         redis_port_ = static_cast<uint16_t>(redis_port);
-        if (redis_port_ == 0)
-        {
-            redis_port_ = 6379;
-        }
     }
 
     redis_auth_ = reader.GetString("redis", "auth", "");
+    // =======================================================================================
 
-    // user
+    // === user ==============================================================================
     user_account_ = reader.GetString("user", "account", "");
     user_passwd_ = reader.GetString("user", "password", "");
     if (webdav_verification_ != "none")
     {
         assert(!user_account_.empty() && "the user account cannot be empty");
         assert((user_account_.size() >= 8) && "the user password length must be greater than 8 digits");
+    }
+    // =======================================================================================
+
+    /* check for database conflicts */
+    if (sqlite_enable_ == redis_enable_)
+    {
+        sqlite_enable_ = false;
+        std::cerr << "It seems that you have enabled both SQLite and Redis, Redis will be prioritized here." << std::endl;
     }
 }
 
@@ -226,9 +246,9 @@ const std::string& ConfigReader::GetWebDavPrefix() const noexcept
     return webdav_prefix_;
 }
 
-const std::string& ConfigReader::GetWebDavRawPrefix() const noexcept
+const std::string& ConfigReader::GetWebDavRoutePrefix() const noexcept
 {
-    return webdav_raw_prefix_;
+    return webdav_route_prefix_;
 }
 
 const std::filesystem::path& ConfigReader::GetWebDavRelativeDataPath() const noexcept
@@ -254,6 +274,21 @@ const std::string& ConfigReader::GetWebDavRealm() const noexcept
 int8_t ConfigReader::GetWebDavMaxRecurseDepth() const noexcept
 {
     return webdav_max_recurse_depth_;
+}
+
+bool ConfigReader::GetSQLiteEnable() const noexcept
+{
+    return sqlite_enable_;
+}
+
+ const std::filesystem::path& ConfigReader::GetSQLiteLocation() const noexcept
+{
+    return sqlite_location_;
+}
+
+bool ConfigReader::GetRedisEnable() const noexcept
+{
+    return redis_enable_;
 }
 
 const std::string& ConfigReader::GetRedisHost() const noexcept

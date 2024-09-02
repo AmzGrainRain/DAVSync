@@ -1,5 +1,6 @@
 #include <exception>
 #include <iostream>
+#include <stdexcept>
 #include <string_view>
 
 #include <cinatra/coro_http_request.hpp>  // class cinatra::coro_http_request
@@ -7,8 +8,8 @@
 #include <cinatra/coro_http_server.hpp>   // class cinatra::coro_http_server
 #include <pugixml.hpp>                    // namespace pugixml
 
-#include "section/basic_auth.h"  // struct Section::BasicAuth
-#include "section/digest_auth.h" // struct Section::DigestAuth
+#include "section/BasicAuth.h"  // struct Section::BasicAuth
+#include "section/DigestAuth.h" // struct Section::DigestAuth
 
 #include "routes/webdav/copy.h"      // func Routes::WebDAV::COPY
 #include "routes/webdav/delete.h"    // func Routes::WebDAV::DEL
@@ -24,7 +25,7 @@
 #include "routes/webdav/put.h"       // func Routes::WebDAV::PUT
 #include "routes/webdav/unlock.h"    // func Routes::WebDAV::UNLOCK
 
-#include "config_reader.h" // class ConfigReader
+#include "ConfigReader.h" // class ConfigReader
 
 inline static void use_webdav_service(cinatra::coro_http_server& app, const std::string prefix,
                                       const std::string_view& auth_type)
@@ -82,7 +83,7 @@ inline static void use_webdav_service(cinatra::coro_http_server& app, const std:
     }
     else
     {
-        throw std::exception("[settings.ini] Unknow webdav.verification value.");
+        throw std::runtime_error("[settings.ini] Unknow webdav.verification value.");
     }
 }
 
@@ -95,7 +96,7 @@ int main()
         const ConfigReader& conf = ConfigReader::GetInstance();
 
         coro_http_server app{conf.GetHttpMaxThread(), conf.GetHttpPort(), conf.GetHttpAddress()};
-        use_webdav_service(app, conf.GetWebDavRawPrefix(), conf.GetWebDavVerification());
+        use_webdav_service(app, conf.GetWebDavRoutePrefix(), conf.GetWebDavVerification());
 
         app.set_http_handler<GET>("/", [](coro_http_request& req, coro_http_response& res) -> void {
             res.set_content_type<resp_content_type::html>();
