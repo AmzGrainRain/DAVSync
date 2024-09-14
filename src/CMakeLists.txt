@@ -18,7 +18,10 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     ormpp::static
     pugixml::static
     picosha2::static
+)
+target_link_libraries(${PROJECT_NAME} PRIVATE
     libpqxx::pqxx
+    hiredis::hiredis
 )
 
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")

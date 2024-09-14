@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -176,7 +175,11 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
         redis_port_ = static_cast<uint16_t>(redis_port);
     }
 
-    redis_auth_ = reader.GetString("redis", "auth", "");
+    redis_username_ = reader.GetString("redis", "username", "");
+    assert(!redis_username_.empty() && "[redis.username] Cannot be empty");
+
+    redis_passwd_ = reader.GetString("redis", "password", "");
+    assert(!redis_passwd_.empty() && "[redis.password] Cannot be empty");
     // =======================================================================================
 
     // === user ==============================================================================
@@ -307,9 +310,14 @@ uint16_t ConfigReader::GetRedisPort() const noexcept
     return static_cast<uint16_t>(redis_port_);
 }
 
-const std::string& ConfigReader::GetRedisAuth() const noexcept
+const std::string& ConfigReader::GetRedisUserName() const noexcept
 {
-    return redis_auth_;
+    return redis_username_;
+}
+
+const std::string& ConfigReader::GetRedisPassword() const noexcept
+{
+    return redis_passwd_;
 }
 
 const std::string& ConfigReader::GetUserAccount() const noexcept

@@ -40,7 +40,8 @@ class ConfigReader
     bool GetRedisEnable() const noexcept;
     const std::string& GetRedisHost() const noexcept;
     uint16_t GetRedisPort() const noexcept;
-    const std::string& GetRedisAuth() const noexcept;
+    const std::string& GetRedisUserName() const noexcept;
+    const std::string& GetRedisPassword() const noexcept;
 
     const std::string& GetUserAccount() const noexcept;
     const std::string& GetUserPassword() const noexcept;
@@ -72,7 +73,8 @@ class ConfigReader
     bool redis_enable_;
     std::string redis_host_;
     uint16_t redis_port_;
-    std::string redis_auth_;
+    std::string redis_username_;
+    std::string redis_passwd_;
 
     std::string user_account_;
     std::string user_passwd_;

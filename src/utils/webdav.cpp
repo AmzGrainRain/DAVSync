@@ -13,7 +13,7 @@
 #include "path.h"
 #include "utils/path.h"
 
-std::mutex Mutex_Routes_WebDAV_IMPL_ComputeETag;
+std::mutex utils_webdav_ComputeEtag_LOCK;
 
 namespace utils::webdav
 {
@@ -140,7 +140,7 @@ std::filesystem::path uri_to_absolute(const std::string_view& uri)
 
 std::optional<std::string> compute_etag(const std::filesystem::path& file_path)
 {
-    std::lock_guard<std::mutex> LOCK(Mutex_Routes_WebDAV_IMPL_ComputeETag);
+    std::lock_guard<std::mutex> LOCK(utils_webdav_ComputeEtag_LOCK);
 
     std::ifstream ifs(file_path, std::ios::binary);
     if (!ifs.is_open())

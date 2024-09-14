@@ -5,21 +5,13 @@
 class FileLockService_Redis : public FileLockService
 {
   public:
-    bool LockFile(const std::filesystem::path& file_path)
-    {
-        // TODO
-        return false;
-    }
+    FileLockService_Redis();
 
-    bool UnlockFile(const std::filesystem::path& file_path)
-    {
-        // TODO
-        return false;
-    }
+    FileLockService_Redis(const sw::redis::ConnectionOptions& client_options);
 
-    bool IsLocked(const std::filesystem::path& file_path)
-    {
-        // TODO
-        return false;
-    }
+    bool LockFile(const std::filesystem::path& file_path);
+
+    bool UnlockFile(const std::filesystem::path& file_path);
+
+    bool IsLocked(const std::filesystem::path& file_path);
 };

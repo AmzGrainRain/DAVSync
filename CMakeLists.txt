@@ -13,6 +13,10 @@ if(WIN32)
     add_definitions(-D_WIN32_WINNT=0x0A00)
 endif()
 
+# vcpkg
+find_package(libpqxx CONFIG REQUIRED)
+find_package(hiredis CONFIG REQUIRED)
+
 # external
 include_directories(external)
 include(external/inih.cmake)

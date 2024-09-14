@@ -65,9 +65,13 @@ find_package(Threads REQUIRED)
 
 # library properties
 add_library(cinatra-static INTERFACE)
-target_include_directories(cinatra-static SYSTEM INTERFACE ${CMAKE_SOURCE_DIR}/external/cinatra/include)
-
 add_library(cinatra::static ALIAS cinatra-static)
+set_target_properties(cinatra-static PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+target_include_directories(cinatra-static SYSTEM INTERFACE ${CMAKE_SOURCE_DIR}/external/cinatra/include)
 
 # simd
 message(STATUS "Enable simd: ${ENABLE_SIMD}")
