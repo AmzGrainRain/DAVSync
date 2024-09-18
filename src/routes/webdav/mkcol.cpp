@@ -12,7 +12,7 @@ void MKCOL(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
 
-    std::string abs_path = utils::webdav::uri_to_absolute(req.get_url());
+    std::filesystem::path abs_path = utils::webdav::uri_to_absolute(req.get_url());
 
     if (fs::exists(abs_path))
     {

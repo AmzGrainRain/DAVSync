@@ -16,7 +16,7 @@ async_simple::coro::Lazy<void> PUT(cinatra::coro_http_request& req, cinatra::cor
 {
     namespace fs = std::filesystem;
 
-    std::string abs_path = utils::webdav::uri_to_absolute(req.get_url());
+    std::filesystem::path abs_path = utils::webdav::uri_to_absolute(req.get_url());
     if (fs::exists(abs_path))
     {
         // TODO: LOCK
@@ -42,7 +42,7 @@ async_simple::coro::Lazy<void> PUT(cinatra::coro_http_request& req, cinatra::cor
         std::ofstream ofs(abs_path);
         if (!ofs.is_open())
         {
-            throw std::runtime_error(std::format("Unable to open the specified file: {}", abs_path));
+            throw std::runtime_error("Unable to open the specified file");
         }
 
         cinatra::chunked_result result{};

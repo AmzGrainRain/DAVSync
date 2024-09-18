@@ -1,7 +1,6 @@
 project(tests)
 
-include_directories(${CMAKE_SOURCE_DIR}/src)
+add_executable(test_ormpp test_ormpp.cpp)
+add_test(test_ormpp COMMAND test_ormpp)
 
-# test for config_reader.cpp
-# add_executable(test_config_reader test_config_reader.cpp)
-# add_test(NAME test_config_reader COMMAND test_config_reader)
+target_link_libraries(test_ormpp PUBLIC ormpp::headers)
