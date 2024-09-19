@@ -7,6 +7,7 @@
 
 #include <cinatra/coro_http_connection.hpp>
 
+#include "ConfigReader.h"
 #include "utils/webdav.h"
 
 namespace Routes::WebDAV
@@ -15,8 +16,9 @@ namespace Routes::WebDAV
 async_simple::coro::Lazy<void> PUT(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
+    const auto& conf = ConfigReader::GetInstance();
 
-    std::filesystem::path abs_path = utils::webdav::uri_to_absolute(req.get_url());
+    std::filesystem::path abs_path = utils::webdav::uri_to_absolute(conf.GetWebDavAbsoluteDataPath(), conf.GetWebDavPrefix(), req.get_url());
     if (fs::exists(abs_path))
     {
         // TODO: LOCK

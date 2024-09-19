@@ -15,14 +15,10 @@ namespace Routes::WebDAV
 
 void PROPFIND(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
-    const auto& depth_header = req.get_header_value("Depth");
-    if (depth_header.empty())
-    {
-        res.set_status(cinatra::status_type::bad_request);
-        return;
-    }
+    const auto& conf = ConfigReader::GetInstance();
 
-    std::filesystem::path abs_path = utils::webdav::uri_to_absolute(req.get_url());
+    std::filesystem::path abs_path =
+        utils::webdav::uri_to_absolute(conf.GetWebDavAbsoluteDataPath(), conf.GetWebDavPrefix(), req.get_url());
     bool is_file = std::filesystem::is_regular_file(abs_path);
     if (!is_file && !std::filesystem::is_directory(abs_path))
     {
@@ -30,8 +26,12 @@ void PROPFIND(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
-    pugi::xml_document xml_doc;
-    pugi::xml_node multistatus = utils::webdav::generate_multistatus(xml_doc);
+    const auto& depth_header = req.get_header_value("Depth");
+    if (depth_header.empty())
+    {
+        res.set_status(cinatra::status_type::bad_request);
+        return;
+    }
 
     int8_t depth;
     if (depth_header == "infinity")
@@ -49,6 +49,9 @@ void PROPFIND(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         }
     }
 
+    pugi::xml_document xml_doc;
+    pugi::xml_node multistatus =
+        utils::webdav::generate_multistatus(xml_doc, conf.GetRedisEnable(), conf.GetRedisHost());
     utils::webdav::generate_response_list_recurse(multistatus, abs_path, depth);
     std::ostringstream oss;
     xml_doc.save(oss);

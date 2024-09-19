@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string_view>
 
+#include "ConfigReader.h"
 #include "utils/webdav.h"
 
 namespace Routes::WebDAV
@@ -11,8 +12,13 @@ namespace Routes::WebDAV
 void COPY(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
+    const auto& conf = ConfigReader::GetInstance();
+    const auto uri_to_absolute = [&conf](const std::string_view& uri){
+        return utils::webdav::uri_to_absolute(conf.GetWebDavAbsoluteDataPath(), conf.GetWebDavPrefix(), uri);
+    };
 
-    fs::path source_path = utils::webdav::uri_to_absolute(req.get_url());
+    // source
+    fs::path source_path = uri_to_absolute(req.get_url());
     if (!fs::exists(source_path))
     {
         res.set_status(cinatra::status_type::not_found);
@@ -28,10 +34,12 @@ void COPY(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
-    fs::path dest_path = utils::webdav::uri_to_absolute(dest_header);
+    // copy in place? do nothing
+    fs::path dest_path = uri_to_absolute(dest_header);
     if (source_path == dest_path)
     {
-        res.set_status(cinatra::status_type::precondition_failed);
+        // res.set_status(cinatra::status_type::precondition_failed);
+        res.set_status(cinatra::status_type::ok);
         return;
     }
 
@@ -73,6 +81,7 @@ void COPY(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
+    // final
     try {
         if (fs::is_directory(dest_path))
             fs::copy(source_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);

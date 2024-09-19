@@ -19,7 +19,6 @@ int main()
 
     {
         sqlite.create_datatable<Student>(ormpp_auto_key{"id"});
-        sqlite.insert<Student>({"lkh", 'N', 21, "2201"});
         sqlite.insert<Student>({"wyy", 'N', 99, "2202"});
         sqlite.insert<Student>({"zz", 'N', 999, "2202"});
 

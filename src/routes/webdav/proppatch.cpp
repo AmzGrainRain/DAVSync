@@ -43,7 +43,8 @@ void PROPPATCH(cinatra::coro_http_request& req, cinatra::coro_http_response& res
             }
         }
 
-        // ok
+        res.set_status(cinatra::status_type::ok);
+        return;
     } catch (const std::exception& err) {
         std::cout << err.what() << std::endl;
         res.set_status(cinatra::status_type::internal_server_error);

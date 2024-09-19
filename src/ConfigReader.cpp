@@ -6,9 +6,9 @@
 #include <thread>
 #include <utility>
 
-#include <inih/cpp/INIReader.h>
 #include "ConfigReader.h"
 #include "utils/path.h"
+#include <inih/cpp/INIReader.h>
 
 inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::path& file)
 {
@@ -161,7 +161,6 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
     // =======================================================================================
 
     // === sqlite ============================================================================
-    sqlite_enable_ = reader.GetBoolean("sqlite", "enable", true);
     sqlite_location_ = reader.GetString("sqlite", "location", "./file_index.db");
     // =======================================================================================
 
@@ -191,18 +190,6 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
         assert((user_account_.size() >= 8) && "the user password length must be greater than 8 digits");
     }
     // =======================================================================================
-
-    /* check for database conflicts */
-    if (!sqlite_enable_ && !redis_enable_)
-    {
-        std::cerr << "It seems that you have disabled both SQLite and Redis, SQLite will be prioritized here." << std::endl;
-        sqlite_enable_ = true;
-    }
-    else if (sqlite_enable_ && redis_enable_)
-    {
-        sqlite_enable_ = false;
-        std::cerr << "It seems that you have enabled both SQLite and Redis, Redis will be prioritized here." << std::endl;
-    }
 }
 
 const std::filesystem::path& ConfigReader::GetCWD() const noexcept
@@ -285,12 +272,7 @@ int8_t ConfigReader::GetWebDavMaxRecurseDepth() const noexcept
     return webdav_max_recurse_depth_;
 }
 
-bool ConfigReader::GetSQLiteEnable() const noexcept
-{
-    return sqlite_enable_;
-}
-
- const std::filesystem::path& ConfigReader::GetSQLiteLocation() const noexcept
+const std::filesystem::path& ConfigReader::GetSQLiteLocation() const noexcept
 {
     return sqlite_location_;
 }

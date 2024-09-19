@@ -1,6 +1,7 @@
 #include "head.h"
 #include <filesystem>
 
+#include "ConfigReader.h"
 #include "utils/webdav.h"
 #include "utils/file.h"
 
@@ -10,8 +11,9 @@ namespace Routes::WebDAV
 void HEAD(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
+    const auto& conf = ConfigReader::GetInstance();
 
-    fs::path abs_path = utils::webdav::uri_to_absolute(req.get_url());
+    fs::path abs_path = utils::webdav::uri_to_absolute(conf.GetWebDavAbsoluteDataPath(), conf.GetWebDavPrefix(), req.get_url());
     if (!fs::exists(abs_path))
     {
         res.set_status(cinatra::status_type::not_found);

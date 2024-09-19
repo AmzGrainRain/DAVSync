@@ -34,7 +34,6 @@ class ConfigReader
     const std::string& GetWebDavRealm() const noexcept;
     int8_t GetWebDavMaxRecurseDepth() const noexcept;
 
-    bool GetSQLiteEnable() const noexcept;
     const std::filesystem::path& GetSQLiteLocation() const noexcept;
 
     bool GetRedisEnable() const noexcept;
@@ -67,7 +66,6 @@ class ConfigReader
     std::string webdav_realm_;
     int8_t webdav_max_recurse_depth_;
 
-    bool sqlite_enable_;
     std::filesystem::path sqlite_location_;
 
     bool redis_enable_;

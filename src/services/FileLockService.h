@@ -1,21 +1,40 @@
 #pragma once
 
 #include <chrono>
-#include <string>
+
+#include <mutex>
+#include <ormpp/dbng.hpp>
+#include <ormpp/sqlite.hpp>
 
 enum class FileLockType
 {
-    NONE = 0,
-    SHARED,
+    SHARED = 0,
     EXCLUSIVE
 };
 
-class FileLockService
+struct FileLockTableRow
+{
+    std::string etag;
+    FileLockType type;
+    std::chrono::milliseconds expire_time;
+};
+
+class FileLockerService
 {
   public:
-    virtual ~FileLockService() {};
-    virtual bool LockFile(const std::string& lock_token, FileLockType lock_type,
-                          std::chrono::seconds lock_expire_time) const = 0;
-    virtual bool UnlockFile(const std::string& lock_token) const = 0;
-    virtual bool IsLocked(const std::string& lock_token) const = 0;
+    static FileLockerService& GetInstance();
+
+    bool Lock(const std::string& etag, FileLockType type = FileLockType::SHARED,
+              std::chrono::milliseconds expire_time = std::chrono::milliseconds{0});
+
+    bool Unlock(const std::string& etag);
+
+    bool ModifyLock(const std::string& etag, FileLockType type);
+
+    bool IsLocked(const std::string& etag);
+
+  private:
+    FileLockerService();
+
+    ormpp::dbng<ormpp::sqlite> dbng_;
 };

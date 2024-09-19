@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 
+#include "ConfigReader.h"
 #include "utils/webdav.h"
 
 namespace Routes::WebDAV
@@ -11,9 +12,9 @@ namespace Routes::WebDAV
 void MKCOL(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
+    const auto& conf = ConfigReader::GetInstance();
 
-    std::filesystem::path abs_path = utils::webdav::uri_to_absolute(req.get_url());
-
+    std::filesystem::path abs_path = utils::webdav::uri_to_absolute(conf.GetWebDavAbsoluteDataPath(), conf.GetWebDavPrefix(), req.get_url());
     if (fs::exists(abs_path))
     {
         if (fs::is_directory(abs_path))

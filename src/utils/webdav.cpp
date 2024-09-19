@@ -1,27 +1,25 @@
 #include "webdav.h"
 
 #include <cassert>
+#include <chrono>
 #include <filesystem>
+#include <format>
+#include <mutex>
 #include <stack>
 #include <utility>
-#include <format>
-#include <chrono>
-#include <mutex>
 
-#include <PicoSHA2/picosha2.h>
-#include "ConfigReader.h"
 #include "path.h"
 #include "utils/path.h"
+#include <PicoSHA2/picosha2.h>
 
 std::mutex utils_webdav_ComputeEtag_LOCK;
 
 namespace utils::webdav
 {
 
-pugi::xml_node generate_multistatus(pugi::xml_node& xml_doc)
+pugi::xml_node generate_multistatus(pugi::xml_node& xml_doc, bool ssl_enabled, const std::string& host)
 {
-    static const auto& conf = ConfigReader::GetInstance();
-    const std::string my = std::format("{}://{}", conf.GetSSLEnabled() ? "https" : "http", conf.GetHttpHost());
+    const std::string my = std::format("{}://{}", ssl_enabled ? "https" : "http", host);
 
     pugi::xml_node xml_ms = xml_doc.append_child("D:multistatus");
     xml_ms.append_attribute("xmlns:D") = "DAV:";
@@ -33,10 +31,9 @@ pugi::xml_node generate_multistatus(pugi::xml_node& xml_doc)
 void generate_response(pugi::xml_node& multistatus, const std::filesystem::path& path)
 {
     bool is_directory = std::filesystem::is_directory(path);
-    const auto& conf = ConfigReader::GetInstance();
     auto xml_res = multistatus.append_child("D:response");
 
-    auto relative_file_path = std::filesystem::relative(path, conf.GetCWD());
+    auto relative_file_path = std::filesystem::relative(path, std::filesystem::current_path());
     std::string file_path = utils::path::with_separator(relative_file_path, 1, is_directory, '/');
     file_path.insert(file_path.begin(), '/'); // begin with '/'
 
@@ -81,7 +78,6 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std:
     if (depth <= 0 || dirs.empty())
         return;
 
-    static const auto& conf = ConfigReader::GetInstance();
     std::stack<fs::path> sub_dirs;
 
     while (!dirs.empty())
@@ -90,7 +86,7 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std:
         {
             auto xml_res = multistatus.append_child("D:response");
             std::string file_path =
-                utils::path::with_separator(fs::relative(entry, conf.GetCWD()), 1, entry.is_directory(), '/');
+                utils::path::with_separator(fs::relative(entry, std::filesystem::current_path()), 1, entry.is_directory(), '/');
             file_path.insert(file_path.begin(), '/');
             xml_res.append_child("D:href").text().set(file_path.c_str());
 
@@ -127,15 +123,14 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, const std::file
     generate_response_list_recurse(multistatus, std::move(stack), depth);
 }
 
-std::filesystem::path uri_to_absolute(const std::string_view& uri)
+auto uri_to_absolute(const std::filesystem::path& webdav_abslute_data_path, const std::string& webdav_prefix,
+                     const std::string_view& uri) -> std::filesystem::path
 {
-    const auto& conf = ConfigReader::GetInstance();
-
-    std::string uri_str{uri.substr(conf.GetWebDavPrefix().size())};
+    std::string uri_str{uri.substr(webdav_prefix.size())};
     uri_str.insert(uri_str.begin(), '/');
     uri_str.insert(uri_str.begin(), '.');
 
-    return (conf.GetWebDavAbsoluteDataPath() / uri_str).lexically_normal();
+    return (webdav_abslute_data_path / uri_str).lexically_normal();
 }
 
 std::optional<std::string> compute_etag(const std::filesystem::path& file_path)

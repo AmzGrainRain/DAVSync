@@ -16,8 +16,9 @@
 
 inline std::string GenerateMultiStatus(const std::filesystem::path& dir)
 {
+    const auto& conf = ConfigReader::GetInstance();
     pugi::xml_document xml_doc;
-    utils::webdav::generate_multistatus(xml_doc);
+    utils::webdav::generate_multistatus(xml_doc, conf.GetSSLEnabled(), conf.GetHttpHost());
     utils::webdav::generate_response_list(xml_doc, dir);
     std::ostringstream oss;
     xml_doc.save(oss);
@@ -60,8 +61,9 @@ namespace Routes::WebDAV
 void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
+    const auto& conf = ConfigReader::GetInstance();
 
-    fs::path abs_path = utils::webdav::uri_to_absolute(req.get_url());
+    fs::path abs_path = utils::webdav::uri_to_absolute(conf.GetWebDavAbsoluteDataPath(), conf.GetWebDavPrefix(), req.get_url());
     if (!fs::exists(abs_path))
     {
         res.set_status(cinatra::status_type::not_found);
@@ -82,7 +84,6 @@ void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
-    const std::string_view& client_etag = req.get_header_value("If-None-Match");
     auto server_etag = utils::webdav::compute_etag(abs_path);
     if (!server_etag)
     {
@@ -90,6 +91,11 @@ void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
+    //  There are ONLY TWO SITUATIONS where we need to respond to the client:
+    //  1. When the request header does not have "If-None-Match" property.
+    //  2. When the request header has "If-None-Match", and its value does
+    //     not match the ETag computed by the server.
+    const std::string_view& client_etag = req.get_header_value("If-None-Match");
     if (client_etag.empty() || client_etag != server_etag.value())
     {
         res.add_header("ETag", server_etag.value());
@@ -97,6 +103,7 @@ void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
+    // ETag matched
     res.set_status(cinatra::status_type::not_modified);
 }
 
