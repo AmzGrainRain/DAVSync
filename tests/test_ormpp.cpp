@@ -1,6 +1,8 @@
 #include "ormpp/dbng.hpp"
 #include "ormpp/sqlite.hpp"
 
+#include <filesystem>
+
 struct Student
 {
     std::string name;
@@ -19,8 +21,13 @@ int main()
 
     {
         sqlite.create_datatable<Student>(ormpp_auto_key{"id"});
-        sqlite.insert<Student>({"wyy", 'N', 99, "2202"});
+        sqlite.insert<Student>({"zz", 'N', 99, "2202"});
         sqlite.insert<Student>({"zz", 'N', 999, "2202"});
+
+        if(sqlite.delete_records_s<Student>("name='zz' and age=99"))
+        {
+            std::cout << "OK" << std::endl;
+        }
 
         for (auto& [name, sex, age, classroom, id] : sqlite.query_s<Student>())
         {

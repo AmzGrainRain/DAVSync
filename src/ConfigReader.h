@@ -4,6 +4,7 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 
 class ConfigReader
 {
@@ -22,7 +23,9 @@ class ConfigReader
     uint16_t GetHttpMaxThread() const noexcept;
     size_t GetHttpBufferSize() const noexcept;
 
-    bool GetSSLEnabled() const noexcept;
+    bool GetHttpsEnabled() const noexcept;
+    uint16_t GetHttpsPort() const noexcept;
+    bool GetHttpsOnly() const noexcept;
     const std::filesystem::path& GetSSLCertPath() const noexcept;
     const std::filesystem::path& GetSSLKeyPath() const noexcept;
 
@@ -30,20 +33,25 @@ class ConfigReader
     const std::string& GetWebDavRoutePrefix() const noexcept;
     const std::filesystem::path& GetWebDavRelativeDataPath() const noexcept;
     const std::filesystem::path& GetWebDavAbsoluteDataPath() const noexcept;
-    const std::string& GetWebDavVerification() const noexcept;
-    const std::string& GetWebDavRealm() const noexcept;
     int8_t GetWebDavMaxRecurseDepth() const noexcept;
+    const std::string& GetWebDavRealm() const noexcept;
+    const std::string& GetWebDavVerification() const noexcept;
+    auto GetWebDavUser() const noexcept -> const std::unordered_map<std::string, std::string>&;
+    bool GetWebDavResetLock() const noexcept;
 
-    const std::filesystem::path& GetSQLiteLocation() const noexcept;
-
-    bool GetRedisEnable() const noexcept;
     const std::string& GetRedisHost() const noexcept;
     uint16_t GetRedisPort() const noexcept;
     const std::string& GetRedisUserName() const noexcept;
     const std::string& GetRedisPassword() const noexcept;
 
-    const std::string& GetUserAccount() const noexcept;
-    const std::string& GetUserPassword() const noexcept;
+    const std::string& GetETagEngine() const noexcept;
+    const std::string& GetLockEngine() const noexcept;
+    const std::string& GetPropEngine() const noexcept;
+
+    const std::filesystem::path& GetSQLiteDB() const noexcept;
+    const std::filesystem::path& GetETagData() const noexcept;
+    const std::filesystem::path& GetLockData() const noexcept;
+    const std::filesystem::path& GetPropData() const noexcept;
 
   private:
     std::filesystem::path cwd_;
@@ -54,26 +62,33 @@ class ConfigReader
     uint16_t http_max_thread_;
     size_t http_buffer_size_;
 
-    bool ssl_enable_;
-    std::filesystem::path ssl_cert_path_;
-    std::filesystem::path ssl_key_path_;
+    bool https_enable_;
+    uint16_t https_port_;
+    bool https_only_;
+    std::filesystem::path ssl_cert_;
+    std::filesystem::path ssl_key_;
 
     std::string webdav_prefix_;
     std::string webdav_route_prefix_;
     std::filesystem::path webdav_relative_data_path_;
     std::filesystem::path webdav_absolute_data_path_;
-    std::string webdav_verification_;
-    std::string webdav_realm_;
     int8_t webdav_max_recurse_depth_;
+    std::string webdav_realm_;
+    std::string webdav_verification_;
+    std::unordered_map<std::string, std::string> webdav_user_;
+    bool webdav_reset_lock_;
 
-    std::filesystem::path sqlite_location_;
-
-    bool redis_enable_;
     std::string redis_host_;
     uint16_t redis_port_;
     std::string redis_username_;
-    std::string redis_passwd_;
+    std::string redis_password_;
 
-    std::string user_account_;
-    std::string user_passwd_;
+    std::string etag_engine_;
+    std::string lock_engine_;
+    std::string prop_engine_;
+
+    std::filesystem::path sqlite_db_;
+    std::filesystem::path etag_data_;
+    std::filesystem::path lock_data_;
+    std::filesystem::path prop_data_;
 };

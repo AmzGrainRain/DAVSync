@@ -12,6 +12,7 @@ find_package(libpqxx CONFIG REQUIRED)
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE
+    spdlog::spdlog_header_only
     cinatra::headers
     inih::static
     ormpp::headers

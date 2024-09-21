@@ -1,14 +1,31 @@
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <string_view>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
+
+#include <inih/cpp/INIReader.h>
 
 #include "ConfigReader.h"
 #include "utils/path.h"
-#include <inih/cpp/INIReader.h>
+
+static inline void user_parse(std::unordered_map<std::string, std::string>& users, const std::string_view& str)
+{
+    auto pos = str.find_last_of(':');
+    if (pos == std::string_view::npos)
+    {
+        return;
+    }
+
+    users.emplace(std::string{str.substr(0, pos)}, std::string{str.substr(pos + 1)});
+}
 
 inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::path& file)
 {
@@ -89,7 +106,7 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
     assert(!http_address_.empty() && "[http.address] Illegal address");
 
     {
-        long http_port = reader.GetInteger("http", "port", 8111);
+        long http_port = reader.GetInteger("http", "port", 8110);
         assert(std::in_range<uint16_t>(http_port) && "[http.port] Must be within the range of [0-65535]");
         http_port_ = static_cast<uint16_t>(http_port);
     }
@@ -108,14 +125,20 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
     }
     // =======================================================================================
 
-    // === ssl ===============================================================================
-    ssl_enable_ = reader.GetBoolean("ssl", "enable", "false");
-    ssl_cert_path_ = reader.GetString("ssl", "cert", "");
-    ssl_key_path_ = reader.GetString("ssl", "key", "");
-    if (ssl_enable_)
+    // === https =============================================================================
+    https_enable_ = reader.GetBoolean("https", "enable", "false");
     {
-        assert(std::filesystem::is_regular_file(ssl_cert_path_) && "[ssl.cert] Not exist");
-        assert(std::filesystem::is_regular_file(ssl_key_path_) && "[ssl.key] Not exist");
+        long https_port = reader.GetInteger("https", "port", 8111);
+        assert(std::in_range<uint16_t>(https_port) && "[https.port] Must be within the range of [0-65535]");
+        https_port_ = static_cast<uint16_t>(https_port);
+    }
+    https_only_ = reader.GetBoolean("https", "https-only", true);
+    ssl_cert_ = reader.GetString("ssl", "cert", "");
+    ssl_key_ = reader.GetString("ssl", "key", "");
+    if (https_enable_)
+    {
+        assert(std::filesystem::is_regular_file(ssl_cert_) && "[ssl.cert] Not exist");
+        assert(std::filesystem::is_regular_file(ssl_key_) && "[ssl.key] Not exist");
     }
     // =======================================================================================
 
@@ -152,20 +175,34 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
         webdav_max_recurse_depth_ = static_cast<int8_t>(webdav_max_recurse_depth);
     }
 
+    webdav_realm_ = reader.GetString("webdav", "realm", "WebDavRealm");
+    assert(!webdav_realm_.empty() && "[webdav.realm] Cannot be empty");
+
     webdav_verification_ = reader.GetString("wevdav", "verification", "none");
     assert((webdav_verification_ == "basic" || webdav_verification_ == "digest" || webdav_verification_ == "none") &&
            "[webdav.verification] Must be one of them [basic|digest|none]");
 
-    webdav_realm_ = reader.GetString("webdav", "realm", "WebDavRealm");
-    assert(!webdav_realm_.empty() && "[webdav.realm] Cannot be empty");
-    // =======================================================================================
+    webdav_reset_lock_ = reader.GetBoolean("webdav", "reset-lock", true);
 
-    // === sqlite ============================================================================
-    sqlite_location_ = reader.GetString("sqlite", "location", "./file_index.db");
+    // parse user list
+    std::string users_str = reader.GetString("webdav", "users", "");
+    std::string_view users_view = users_str;
+    for (size_t i = 0, j = 0; i < users_view.size(); ++i)
+    {
+        if (users_view[i] == ',')
+        {
+            if (j >= i)
+            {
+                continue;
+            }
+            user_parse(webdav_user_, users_view.substr(j, i));
+            ++i;
+            j = i;
+        }
+    }
     // =======================================================================================
 
     // === redis =============================================================================
-    redis_enable_ = reader.GetBoolean("redis", "enable", false);
     redis_host_ = reader.GetString("redis", "host", "localhost");
 
     {
@@ -177,18 +214,28 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
     redis_username_ = reader.GetString("redis", "username", "");
     assert(!redis_username_.empty() && "[redis.username] Cannot be empty");
 
-    redis_passwd_ = reader.GetString("redis", "password", "");
-    assert(!redis_passwd_.empty() && "[redis.password] Cannot be empty");
+    redis_password_ = reader.GetString("redis", "password", "");
+    assert(!redis_password_.empty() && "[redis.password] Cannot be empty");
     // =======================================================================================
 
-    // === user ==============================================================================
-    user_account_ = reader.GetString("user", "account", "");
-    user_passwd_ = reader.GetString("user", "password", "");
-    if (webdav_verification_ != "none")
-    {
-        assert(!user_account_.empty() && "the user account cannot be empty");
-        assert((user_account_.size() >= 8) && "the user password length must be greater than 8 digits");
-    }
+    // === engine ============================================================================
+    std::unordered_set<std::string> engine_list{"memory", "sqlite", "redis"};
+
+    etag_engine_ = reader.GetString("engine", "etag", "sqlite");
+    assert(engine_list.contains(etag_engine_) && "[engine.etag] Must be one of them [memory|sqlite|redis]");
+
+    lock_engine_ = reader.GetString("engine", "lock", "memory");
+    assert(engine_list.contains(lock_engine_) && "[engine.lock] Must be one of them [memory|sqlite|redis]");
+
+    prop_engine_ = reader.GetString("engine", "prop", "sqlite");
+    assert(engine_list.contains(prop_engine_) && "[engine.prop] Must be one of them [memory|sqlite|redis]");
+    // =======================================================================================
+
+    // === cache =-===========================================================================
+    sqlite_db_ = reader.GetString("cache", "sqlite-db", "./data.db");
+    etag_data_ = reader.GetString("cache", "etag-data", "./etag.dat");
+    lock_data_ = reader.GetString("cache", "lock-data", "./lock.dat");
+    prop_data_ = reader.GetString("cache", "prop-data", "./prop.dat");
     // =======================================================================================
 }
 
@@ -222,19 +269,29 @@ size_t ConfigReader::GetHttpBufferSize() const noexcept
     return http_buffer_size_;
 }
 
-bool ConfigReader::GetSSLEnabled() const noexcept
+bool ConfigReader::GetHttpsEnabled() const noexcept
 {
-    return ssl_enable_;
+    return https_enable_;
+}
+
+uint16_t ConfigReader::GetHttpsPort() const noexcept
+{
+    return https_port_;
+}
+
+bool ConfigReader::GetHttpsOnly() const noexcept
+{
+    return https_only_;
 }
 
 const std::filesystem::path& ConfigReader::GetSSLCertPath() const noexcept
 {
-    return ssl_cert_path_;
+    return ssl_cert_;
 }
 
 const std::filesystem::path& ConfigReader::GetSSLKeyPath() const noexcept
 {
-    return ssl_key_path_;
+    return ssl_key_;
 }
 
 const std::string& ConfigReader::GetWebDavPrefix() const noexcept
@@ -257,9 +314,9 @@ const std::filesystem::path& ConfigReader::GetWebDavAbsoluteDataPath() const noe
     return webdav_absolute_data_path_;
 }
 
-const std::string& ConfigReader::GetWebDavVerification() const noexcept
+int8_t ConfigReader::GetWebDavMaxRecurseDepth() const noexcept
 {
-    return webdav_verification_;
+    return webdav_max_recurse_depth_;
 }
 
 const std::string& ConfigReader::GetWebDavRealm() const noexcept
@@ -267,19 +324,19 @@ const std::string& ConfigReader::GetWebDavRealm() const noexcept
     return webdav_realm_;
 }
 
-int8_t ConfigReader::GetWebDavMaxRecurseDepth() const noexcept
+const std::string& ConfigReader::GetWebDavVerification() const noexcept
 {
-    return webdav_max_recurse_depth_;
+    return webdav_verification_;
 }
 
-const std::filesystem::path& ConfigReader::GetSQLiteLocation() const noexcept
+auto ConfigReader::GetWebDavUser() const noexcept -> const std::unordered_map<std::string, std::string>&
 {
-    return sqlite_location_;
+    return webdav_user_;
 }
 
-bool ConfigReader::GetRedisEnable() const noexcept
+bool ConfigReader::GetWebDavResetLock() const noexcept
 {
-    return redis_enable_;
+    return webdav_reset_lock_;
 }
 
 const std::string& ConfigReader::GetRedisHost() const noexcept
@@ -299,15 +356,40 @@ const std::string& ConfigReader::GetRedisUserName() const noexcept
 
 const std::string& ConfigReader::GetRedisPassword() const noexcept
 {
-    return redis_passwd_;
+    return redis_password_;
 }
 
-const std::string& ConfigReader::GetUserAccount() const noexcept
+const std::string& ConfigReader::GetETagEngine() const noexcept
 {
-    return user_account_;
+    return etag_engine_;
 }
 
-const std::string& ConfigReader::GetUserPassword() const noexcept
+const std::string& ConfigReader::GetLockEngine() const noexcept
 {
-    return user_passwd_;
+    return lock_engine_;
+}
+
+const std::string& ConfigReader::GetPropEngine() const noexcept
+{
+    return prop_engine_;
+}
+
+const std::filesystem::path& ConfigReader::GetSQLiteDB() const noexcept
+{
+    return sqlite_db_;
+}
+
+const std::filesystem::path& ConfigReader::GetETagData() const noexcept
+{
+    return etag_data_;
+}
+
+const std::filesystem::path& ConfigReader::GetLockData() const noexcept
+{
+    return lock_data_;
+}
+
+const std::filesystem::path& ConfigReader::GetPropData() const noexcept
+{
+    return prop_data_;
 }

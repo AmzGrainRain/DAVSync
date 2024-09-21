@@ -15,6 +15,7 @@ if(WIN32)
 endif()
 
 # vcpkg
+find_package(spdlog CONFIG REQUIRED)
 find_package(libpqxx CONFIG REQUIRED)
 find_package(hiredis CONFIG REQUIRED)
 

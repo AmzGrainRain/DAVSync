@@ -1,6 +1,10 @@
 project(tests)
 
 add_executable(test_ormpp test_ormpp.cpp)
+target_link_libraries(test_ormpp PUBLIC ormpp::headers)
 add_test(test_ormpp COMMAND test_ormpp)
 
-target_link_libraries(test_ormpp PUBLIC ormpp::headers)
+
+add_executable(test_redis test_redis.cpp)
+target_link_libraries(test_redis PUBLIC hiredis::hiredis)
+add_test(test_redis COMMAND test_redis)

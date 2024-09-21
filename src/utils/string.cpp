@@ -60,20 +60,32 @@ std::vector<std::string> split(const std::string& str, const std::string_view& s
     return tokens;
 }
 
-auto split2pair(const std::string& str,
-                const std::string_view& separator) -> std::optional<std::pair<std::string, std::string>>
+auto split2pair(const std::string& str, char separator) -> std::pair<std::string, std::string>
 {
     size_t pos = str.find(separator);
     if (pos == std::string::npos)
     {
-        return std::nullopt;
+        return {std::string{str}, {}};
     }
 
-    std::string k = str.substr(0, pos);
-    std::string v = str.substr(pos + 1);
+    auto k = str.substr(0, pos);
+    auto v = str.substr(pos + 1);
     trim(k);
     trim(v);
     return std::pair{std::move(k), std::move(v)};
+}
+
+auto split2pair(const std::string_view& str, char separator) -> std::pair<std::string, std::string>
+{
+    size_t pos = str.find(separator);
+    if (pos == std::string::npos)
+    {
+        return {std::string{str}, {}};
+    }
+
+    auto k = str.substr(0, pos);
+    auto v = str.substr(pos + 1);
+    return std::pair{std::string(k), std::string(v)};
 }
 
 } // namespace utils::string
