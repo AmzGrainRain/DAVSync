@@ -1,5 +1,7 @@
 #include "SQLiteFilePropService.h"
 
+#include <entity.hpp>
+#include <filesystem>
 #include <format>
 
 #include <spdlog/spdlog.h>
@@ -7,12 +9,13 @@
 
 #include "ConfigReader.h"
 #include "FilePropService.h"
+#include "utils/path.h"
 
 namespace FilePropService
 {
 
 REGISTER_AUTO_KEY(FilePropTable, id)
-REFLECTION(FilePropTable, sha, key, value, id)
+REFLECTION(FilePropTable, path, key, value, id)
 
 SQLiteFilePropService::SQLiteFilePropService()
 {
@@ -24,20 +27,22 @@ SQLiteFilePropService::SQLiteFilePropService()
         throw std::runtime_error(dbng_.get_last_error());
     }
 
-    if (!dbng_.create_datatable<FilePropTable>(ormpp_auto_key{"id"}))
+    if (!dbng_.create_datatable<FilePropTable>(ormpp_auto_key{"id"}, ormpp_unique{{"path"}}))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }
 }
 
-bool SQLiteFilePropService::Set(const std::string& path_sha, const PropT& prop)
+bool SQLiteFilePropService::Set(const std::filesystem::path& path, const PropT& prop)
 {
-    return dbng_.insert<FilePropTable>({path_sha, prop.first, prop.second}) == 1;
+    const std::string path_str = utils::path::to_string(path);
+    return dbng_.insert<FilePropTable>({path_str, prop.first, prop.second}) == 1;
 }
 
-std::string SQLiteFilePropService::Get(const std::string& path_sha, const std::string& key)
+std::string SQLiteFilePropService::Get(const std::filesystem::path& path, const std::string& key)
 {
-    auto query_res = dbng_.query_s<FilePropTable>(std::format("sha='{}' and key='{}'", path_sha, key));
+    const std::string path_str = utils::path::to_string(path);
+    const auto query_res = dbng_.query_s<FilePropTable>(std::format("path='{}' and key='{}'", path_str, key));
     if (query_res.size() != 1)
     {
         spdlog::error("The database may be damaged.");
@@ -47,11 +52,12 @@ std::string SQLiteFilePropService::Get(const std::string& path_sha, const std::s
     return query_res[0].value;
 }
 
-std::vector<PropT> SQLiteFilePropService::GetAll(const std::string& path_sha)
+std::vector<PropT> SQLiteFilePropService::GetAll(const std::filesystem::path& path)
 {
+    const std::string path_str = utils::path::to_string(path);
     std::vector<PropT> props;
 
-    auto query_res = dbng_.query_s<FilePropTable>(std::format("sha='{}'", path_sha));
+    const auto query_res = dbng_.query_s<FilePropTable>(std::format("path='{}'", path_str));
     for (const auto& prop : query_res)
     {
         props.push_back({prop.key, prop.value});
@@ -60,14 +66,16 @@ std::vector<PropT> SQLiteFilePropService::GetAll(const std::string& path_sha)
     return props;
 }
 
-bool SQLiteFilePropService::Remove(const std::string& path_sha, const std::string& key)
+bool SQLiteFilePropService::Remove(const std::filesystem::path& path, const std::string& key)
 {
-    return dbng_.delete_records_s<FilePropTable>(std::format("sha='{}' and key='{}'", path_sha, key));
+    const std::string path_str = utils::path::to_string(path);
+    return dbng_.delete_records_s<FilePropTable>(std::format("path='{}' and key='{}'", path_str, key));
 }
 
-bool SQLiteFilePropService::RemoveAll(const std::string& path_sha)
+bool SQLiteFilePropService::RemoveAll(const std::filesystem::path& path)
 {
-    return dbng_.delete_records_s<FilePropTable>(std::format("sha='{}'", path_sha));
+    const std::string path_str = utils::path::to_string(path);
+    return dbng_.delete_records_s<FilePropTable>(std::format("path='{}'", path_str));
 }
 
 } // namespace FilePropService

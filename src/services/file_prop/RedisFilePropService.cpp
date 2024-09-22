@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <filesystem>
 #include <format>
 #include <memory>
 #include <stdexcept>
@@ -13,6 +14,7 @@
 #include <spdlog/spdlog.h>
 
 #include "ConfigReader.h"
+#include "utils/path.h"
 
 namespace FilePropService
 {
@@ -55,11 +57,12 @@ auto RedisFilePropService::Exec(const std::string& command) -> RedisFilePropServ
     return std::move(repl);
 }
 
-bool RedisFilePropService::Set(const std::string& path_sha, const std::pair<std::string, std::string>& prop)
+bool RedisFilePropService::Set(const std::filesystem::path& path, const std::pair<std::string, std::string>& prop)
 {
-    std::string command = std::format(R"(HSET prop:{} {} "{}")", path_sha, prop.first, prop.second);
-    ReplyT repl = Exec(command);
+    const std::string path_str = utils::path::to_string(path);
+    const std::string command = std::format(R"(HSET prop:{} {} "{}")", path_str, prop.first, prop.second);
 
+    ReplyT repl = Exec(command);
     if (!repl)
     {
         return false;
@@ -68,11 +71,12 @@ bool RedisFilePropService::Set(const std::string& path_sha, const std::pair<std:
     return repl->integer == 1;
 }
 
-std::string RedisFilePropService::Get(const std::string& path_sha, const std::string& key)
+std::string RedisFilePropService::Get(const std::filesystem::path& path, const std::string& key)
 {
-    std::string command = std::format("HGET prop:{} {}", path_sha, key);
-    ReplyT repl = Exec(command);
+    const std::string path_str = utils::path::to_string(path);
+    const std::string command = std::format("HGET prop:{} {}", path_str, key);
 
+    ReplyT repl = Exec(command);
     if (!repl)
     {
         return {""};
@@ -81,11 +85,12 @@ std::string RedisFilePropService::Get(const std::string& path_sha, const std::st
     return {repl->str};
 }
 
-std::vector<PropT> RedisFilePropService::GetAll(const std::string& path_sha)
+std::vector<PropT> RedisFilePropService::GetAll(const std::filesystem::path& path)
 {
-    std::string command = std::format("HGETALL prop:{}", path_sha);
-    ReplyT repl = Exec(command);
+    const std::string path_str = utils::path::to_string(path);
+    const std::string command = std::format("HGETALL prop:{}", path_str);
 
+    ReplyT repl = Exec(command);
     if (!repl)
     {
         return {};
@@ -100,11 +105,12 @@ std::vector<PropT> RedisFilePropService::GetAll(const std::string& path_sha)
     return prop_list;
 }
 
-bool RedisFilePropService::Remove(const std::string& path_sha, const std::string& key)
+bool RedisFilePropService::Remove(const std::filesystem::path& path, const std::string& key)
 {
-    std::string command = std::format("HDEL prop:{} {}", path_sha, key);
-    ReplyT repl = Exec(command);
+    const std::string path_str = utils::path::to_string(path);
+    const std::string command = std::format("HDEL prop:{} {}", path_str, key);
 
+    ReplyT repl = Exec(command);
     if (!repl)
     {
         return false;
@@ -113,11 +119,12 @@ bool RedisFilePropService::Remove(const std::string& path_sha, const std::string
     return repl->integer == 1;
 }
 
-bool RedisFilePropService::RemoveAll(const std::string& path_sha)
+bool RedisFilePropService::RemoveAll(const std::filesystem::path& path)
 {
-    std::string command = std::format("DEL prop:{}", path_sha);
-    ReplyT repl = Exec(command);
+    const std::string path_str = utils::path::to_string(path);
+    const std::string command = std::format("DEL prop:{}", path_str);
 
+    ReplyT repl = Exec(command);
     if (!repl)
     {
         return false;

@@ -11,7 +11,6 @@ namespace FileETagService
 struct FileETagTable
 {
   std::string path;
-  std::string path_sha;
   std::string sha;
   size_t id;
 };
@@ -19,8 +18,8 @@ struct FileETagTable
 class FileETagService
 {
   public:
-    virtual std::string Get(const std::string& path_sha) = 0;
-    virtual bool Set(const std::filesystem::path& file) = 0;
+    virtual std::string Get(const std::filesystem::path& path) = 0;
+    virtual bool Set(const std::filesystem::path& path) = 0;
 };
 
 } // namespace FileETagService

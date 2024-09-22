@@ -1,6 +1,7 @@
 #pragma once
 #include "FilePropService.h"
 
+#include <filesystem>
 #include <string>
 
 #include <ormpp/dbng.hpp>
@@ -14,15 +15,15 @@ class SQLiteFilePropService : public FilePropService
   public:
     SQLiteFilePropService();
 
-    bool Set(const std::string& path_sha, const PropT& prop) override;
+    bool Set(const std::filesystem::path& path, const PropT& prop) override;
 
-    std::string Get(const std::string& path_sha, const std::string& key) override;
+    std::string Get(const std::filesystem::path& path, const std::string& key) override;
 
-    std::vector<PropT> GetAll(const std::string& path_sha) override;
+    std::vector<PropT> GetAll(const std::filesystem::path& path) override;
 
-    bool Remove(const std::string& path_sha, const std::string& key) override;
+    bool Remove(const std::filesystem::path& path, const std::string& key) override;
 
-    bool RemoveAll(const std::string& path_sha) override;
+    bool RemoveAll(const std::filesystem::path& path) override;
 
   private:
     ormpp::dbng<ormpp::sqlite> dbng_;

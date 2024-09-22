@@ -13,17 +13,20 @@ namespace FileETagService
 class MemoryFileETagService : public FileETagService
 {
   public:
-    using ETagContainer = std::unordered_map<std::string, std::string>;
+    using ETagMapKeyT = std::filesystem::path;
+    using ETagMapValueT = std::string;
+    using ETagMapT = std::unordered_map<ETagMapKeyT, ETagMapValueT>;
 
     MemoryFileETagService();
+
     ~MemoryFileETagService();
 
-    std::string Get(const std::string& path_sha) override;
+    std::string Get(const std::filesystem::path& path) override;
 
-    bool Set(const std::filesystem::path& file) override;
+    bool Set(const std::filesystem::path& path) override;
 
   private:
-    ETagContainer etag_map_;
+    ETagMapT etag_map_;
     std::ofstream data_;
 };
 

@@ -5,7 +5,7 @@
 #include <ormpp/dbng.hpp>
 #include <ormpp/sqlite.hpp>
 
-namespace FileLockeService
+namespace FileLockService
 {
 
 enum class FileLockType
@@ -16,20 +16,20 @@ enum class FileLockType
 
 struct FileLockTable
 {
-    std::string etag;
+    std::string path_sha;
     FileLockType type;
-    std::chrono::milliseconds expire_time;
+    std::chrono::seconds expire_time;
 };
 
-class FileLockeService
+class FileLockService
 {
   public:
-    virtual bool Lock(const std::string& etag, FileLockType type = FileLockType::SHARED,
-                      std::chrono::milliseconds expire_time = std::chrono::milliseconds{0}) = 0;
+    virtual bool Lock(const std::string& path_sha, FileLockType type = FileLockType::SHARED,
+                      std::chrono::seconds expire_time = std::chrono::seconds{0}) = 0;
 
-    virtual bool Unlock(const std::string& etag) = 0;
+    virtual bool Unlock(const std::string& path_sha) = 0;
 
-    virtual bool IsLocked(const std::string& etag) = 0;
+    virtual bool IsLocked(const std::string& path_sha) = 0;
 };
 
-} // namespace FileLockeService
+} // namespace FileLockService

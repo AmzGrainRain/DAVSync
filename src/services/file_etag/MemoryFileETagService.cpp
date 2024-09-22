@@ -2,10 +2,12 @@
 
 #include <exception>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
 #include <spdlog/spdlog.h>
+#include <utility>
 
 #include "ConfigReader.h"
 #include "utils.h"
@@ -17,43 +19,44 @@ namespace FileETagService
 MemoryFileETagService::MemoryFileETagService()
 {
     const auto& conf = ConfigReader::GetInstance();
+    const auto& data_path = conf.GetETagData();
 
-    if (std::filesystem::exists(conf.GetETagData()))
+    if (std::filesystem::exists(data_path))
     {
-        std::ifstream ifs{conf.GetETagData(), std::ios::in};
+        std::ifstream ifs{data_path, std::ios::in};
         if (!ifs.is_open())
         {
-            spdlog::warn("Unable to open '{}', unable to recover file etags.", conf.GetETagData().string());
+            spdlog::warn("Unable to open '{}', unable to recover file etags.", data_path.string());
             return;
         }
 
-        // line string like this: path_sha,etag
+        // line string like this: path@etag
         std::string raw_line{};
         while (std::getline(ifs, raw_line))
         {
-            std::string_view line = raw_line;
-            auto pos = line.find_last_of(',');
+            const std::string_view line = raw_line;
+            auto pos = line.find_last_of('@');
             if (pos == std::string_view::npos)
             {
                 continue;
             }
 
-            auto path_sha = line.substr(0, pos);
+            auto path_str = line.substr(0, pos);
             auto etag = line.substr(pos + 1);
-            if (path_sha.empty() || etag.empty())
+            if (path_str.empty() || etag.empty())
             {
                 continue;
             }
 
-            etag_map_.insert({std::string{path_sha}, std::string{etag}});
+            etag_map_.insert({ETagMapKeyT{path_str}, ETagMapValueT{etag}});
         }
     }
 
-    data_.open(conf.GetETagData(), std::ios::out);
+    data_.open(data_path, std::ios::out);
     if (!data_.is_open())
     {
         spdlog::warn("Unable to save file etag to '{}', file properties are lost when the server stops.",
-                     conf.GetETagData().string());
+                     data_path.string());
     }
 }
 
@@ -64,30 +67,49 @@ MemoryFileETagService::~MemoryFileETagService()
 
     for (const auto& [path_sha, etag] : etag_map_)
     {
-        data_ << path_sha << ',' << etag << std::endl;
+        data_ << utils::path::to_string(path_sha) << ',' << etag << std::endl;
     }
 
     const auto& conf = ConfigReader::GetInstance();
     spdlog::info("The file etag have been saved to {}", conf.GetETagData().string());
 }
 
-std::string MemoryFileETagService::Get(const std::string& path_sha)
+std::string MemoryFileETagService::Get(const std::filesystem::path& path)
 {
-    if (!etag_map_.contains(path_sha))
+    const auto& it = etag_map_.find(path);
+    if (it == etag_map_.end())
     {
         return {""};
     }
 
-    return {etag_map_.at(path_sha)};
+    return {it->second};
 }
 
-bool MemoryFileETagService::Set(const std::filesystem::path& file)
+bool MemoryFileETagService::Set(const std::filesystem::path& path)
 {
     try
     {
-        std::string path_str = utils::sha256(utils::path::to_string(file));
-        std::string file_sha = utils::sha256(file);
-        etag_map_.insert({std::move(path_str), std::move(file_sha)});
+        const auto& it = etag_map_.find(path);
+        if (it != etag_map_.end())
+        {
+            etag_map_.erase(it);
+        }
+
+        ETagMapValueT sha{};
+        if (std::filesystem::is_directory(path))
+        {
+            sha = utils::sha256(utils::path::to_string(path));
+        }
+        else if (std::filesystem::is_regular_file(path))
+        {
+            sha = utils::sha256(path);
+        }
+        else
+        {
+            throw std::runtime_error("Unexpected file type.");
+        }
+
+        etag_map_.insert({path, std::move(sha)});
         return true;
     }
     catch (const std::exception& err)

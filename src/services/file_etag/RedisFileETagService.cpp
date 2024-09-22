@@ -2,6 +2,7 @@
 
 #include <cassert>
 
+#include <cstring>
 #include <format>
 #include <hiredis/hiredis.h>
 #include <spdlog/spdlog.h>
@@ -51,11 +52,12 @@ auto RedisFileETagService::Exec(const std::string& command) -> RedisFileETagServ
     return std::move(repl);
 }
 
-std::string RedisFileETagService::Get(const std::string& path_sha)
+std::string RedisFileETagService::Get(const std::filesystem::path& path)
 {
-    std::string command = std::format("GET etag:{}", path_sha);
-    ReplyT repl = Exec(command);
+    const std::string key = utils::path::to_string(path);
+    const std::string command = std::format("GET etag:{}", key);
 
+    ReplyT repl = Exec(command);
     if (!repl)
     {
         return {""};
@@ -64,14 +66,25 @@ std::string RedisFileETagService::Get(const std::string& path_sha)
     return {repl->str};
 }
 
-bool RedisFileETagService::Set(const std::filesystem::path& file)
+bool RedisFileETagService::Set(const std::filesystem::path& path)
 {
-    std::string path_sha = utils::sha256(utils::path::to_string(file));
-    std::string file_sha = utils::sha256(file);
+    const std::string path_str = utils::path::to_string(path);
+    std::string sha{};
+    if (std::filesystem::is_directory(path))
+    {
+        sha = utils::sha256(path_str);
+    }
+    else if (std::filesystem::is_regular_file(path))
+    {
+        sha = utils::sha256(path);
+    }
+    else
+    {
+        throw std::runtime_error("Unexpected file type.");
+    }
 
-    std::string command = std::format(R"(SET etag:{} "{}")", path_sha, file_sha);
+    const std::string command = std::format(R"(SET etag:{} "{}")", path_str, sha);
     ReplyT repl = Exec(command);
-
     if (!repl)
     {
         return false;

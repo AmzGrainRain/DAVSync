@@ -1,5 +1,6 @@
 #include "SQLiteFileETagService.h"
 
+#include <format>
 #include <spdlog/spdlog.h>
 
 #include "ConfigReader.h"
@@ -11,7 +12,7 @@ namespace FileETagService
 {
 
 REGISTER_AUTO_KEY(FileETagTable, id)
-REFLECTION(FileETagTable, path, path_sha, sha)
+REFLECTION(FileETagTable, path, sha, id)
 
 SQLiteFileETagService::SQLiteFileETagService()
 {
@@ -23,15 +24,16 @@ SQLiteFileETagService::SQLiteFileETagService()
         throw std::runtime_error(dbng_.get_last_error());
     }
 
-    if (!dbng_.create_datatable<FileETagTable>(ormpp_auto_key{"id"}, ormpp_unique{{"path_sha"}}))
+    if (!dbng_.create_datatable<FileETagTable>(ormpp_auto_key{"id"}, ormpp_unique{{"path"}}))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }
 }
 
-std::string SQLiteFileETagService::Get(const std::string& path_sha)
+std::string SQLiteFileETagService::Get(const std::filesystem::path& path)
 {
-    auto query_res = dbng_.query_s<FileETagTable>(std::format("path_sha='{}'", path_sha));
+    const std::string path_str = utils::path::to_string(path);
+    const auto query_res = dbng_.query_s<FileETagTable>(std::format("path='{}'", path_str));
     if (query_res.size() != 1)
     {
         spdlog::error("The database may be damaged.");
@@ -41,11 +43,36 @@ std::string SQLiteFileETagService::Get(const std::string& path_sha)
     return query_res[0].sha;
 }
 
-bool SQLiteFileETagService::Set(const std::filesystem::path& file)
+bool SQLiteFileETagService::Set(const std::filesystem::path& path)
 {
-    std::string path_sha = utils::sha256(utils::path::to_string(file));
-    std::string file_sha = utils::sha256(file);
-    return dbng_.insert<FileETagTable>({std::move(path_sha), std::move(file_sha)}) == 1;
+    std::string path_str = utils::path::to_string(path);
+    {
+        const std::string where = std::format("path='{}'", path_str);
+        const auto query_res = dbng_.query_s<FileETagTable>(where);
+        if (!query_res.empty())
+        {
+            if (!dbng_.delete_records_s<FileETagTable>(where))
+            {
+                spdlog::warn("Data deletion failed.");
+            }
+        }
+    }
+
+    std::string sha{};
+    if (std::filesystem::is_directory(path))
+    {
+        sha = utils::sha256(path_str);
+    }
+    else if (std::filesystem::is_regular_file(path))
+    {
+        sha = utils::sha256(path);
+    }
+    else
+    {
+        throw std::runtime_error("Unexpected file type.");
+    }
+
+    return dbng_.insert<FileETagTable>({std::move(path_str), std::move(sha)}) == 1;
 }
 
 } // namespace FileETagService

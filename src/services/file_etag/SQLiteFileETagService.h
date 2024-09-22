@@ -12,9 +12,9 @@ class SQLiteFileETagService : public FileETagService
   public:
     SQLiteFileETagService();
 
-    std::string Get(const std::string& path_sha) override;
+    std::string Get(const std::filesystem::path& path) override;
 
-    bool Set(const std::filesystem::path& file) override;
+    bool Set(const std::filesystem::path& path) override;
 
   private:
     ormpp::dbng<ormpp::sqlite> dbng_;
