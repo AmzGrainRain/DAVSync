@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <filesystem>
 
 #include <ormpp/dbng.hpp>
 #include <ormpp/sqlite.hpp>
@@ -24,12 +25,12 @@ struct FileLockTable
 class FileLockService
 {
   public:
-    virtual bool Lock(const std::string& path_sha, FileLockType type = FileLockType::SHARED,
+    virtual bool Lock(const std::filesystem::path& path, FileLockType type = FileLockType::SHARED,
                       std::chrono::seconds expire_time = std::chrono::seconds{0}) = 0;
 
-    virtual bool Unlock(const std::string& path_sha) = 0;
+    virtual bool Unlock(const std::filesystem::path& path) = 0;
 
-    virtual bool IsLocked(const std::string& path_sha) = 0;
+    virtual bool IsLocked(const std::filesystem::path& path) = 0;
 };
 
 } // namespace FileLockService
