@@ -2,7 +2,6 @@
 
 #include <cassert>
 
-#include <cstring>
 #include <format>
 #include <hiredis/hiredis.h>
 #include <spdlog/spdlog.h>
@@ -10,46 +9,27 @@
 #include "ConfigReader.h"
 #include "utils.h"
 #include "utils/path.h"
+#include "utils/redis.h"
+
+using namespace utils::redis;
 
 namespace FileETagService
 {
 
-RedisFileETagService::RedisFileETagService()
+RedisFileETagService::RedisFileETagService() : redis_ctx_(nullptr, &redisFree)
 {
     const auto& conf = ConfigReader::GetInstance();
 
-    redis_ctx_ = std::unique_ptr<redisContext>(redisConnect(conf.GetRedisHost().data(), conf.GetRedisPort()));
-    assert(redis_ctx_);
+    redis_ctx_ = GetRedisContext(conf.GetRedisHost(), conf.GetRedisPort());
     if (redis_ctx_->err)
     {
         throw std::runtime_error(redis_ctx_->errstr);
     }
 
-    auth_str_ = std::format("AUTH {} {}", conf.GetRedisUserName(), conf.GetRedisPassword()).data();
-    ReplyT repl{static_cast<redisReply*>(redisCommand(redis_ctx_.get(), auth_str_.data())), &freeReplyObject};
-    assert(repl);
-    if (std::strcmp(repl->str, "OK") != 0)
+    if (!RedisAuth(redis_ctx_.get(), conf.GetRedisUserName(), conf.GetRedisPassword()))
     {
         throw std::runtime_error("Auth failed.");
     }
-}
-
-auto RedisFileETagService::Exec(const std::string& command) -> RedisFileETagService::ReplyT
-{
-    ReplyT repl{static_cast<redisReply*>(redisCommand(redis_ctx_.get(), command.data())), &freeReplyObject};
-    if (!repl)
-    {
-        spdlog::error("Memory allocation error occurred.");
-        throw std::runtime_error("Memory allocation error occurred.");
-    }
-
-    if (redis_ctx_->err)
-    {
-        spdlog::warn(redis_ctx_->errstr);
-        repl.reset();
-    }
-
-    return std::move(repl);
 }
 
 std::string RedisFileETagService::Get(const std::filesystem::path& path)
@@ -57,7 +37,7 @@ std::string RedisFileETagService::Get(const std::filesystem::path& path)
     const std::string key = utils::path::to_string(path);
     const std::string command = std::format("GET etag:{}", key);
 
-    ReplyT repl = Exec(command);
+    RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl)
     {
         return {""};
@@ -84,13 +64,13 @@ bool RedisFileETagService::Set(const std::filesystem::path& path)
     }
 
     const std::string command = std::format(R"(SET etag:{} "{}")", path_str, sha);
-    ReplyT repl = Exec(command);
+    RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl)
     {
         return false;
     }
 
-    return true;
+    return repl->integer == 1;
 }
 
 } // namespace FileETagService

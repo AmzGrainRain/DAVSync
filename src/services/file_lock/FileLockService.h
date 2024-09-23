@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <filesystem>
 
 #include <ormpp/dbng.hpp>
@@ -17,9 +18,9 @@ enum class FileLockType
 
 struct FileLockTable
 {
-    std::string path_sha;
-    FileLockType type;
-    std::chrono::seconds expire_time;
+    std::string path;
+    int type;
+    size_t expire_time;
 };
 
 class FileLockService

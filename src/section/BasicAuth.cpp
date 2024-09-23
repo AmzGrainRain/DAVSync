@@ -18,7 +18,7 @@ inline static void RequestVerification(cinatra::coro_http_response& res) noexcep
 
 inline static std::string ParseAuthorization(const std::string_view& text_view) noexcept
 {
-    std::string text{text_view};
+    const std::string text{text_view};
     return utils::string::split(text, " ")[1];
 }
 
@@ -42,10 +42,10 @@ bool BasicAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_respo
             return false;
         }
 
-        auto client_base64 = ParseAuthorization(authorization);
         const auto& conf = ConfigReader::GetInstance();
+        const auto client_base64 = ParseAuthorization(authorization);
         auto server_base64 =
-            cinatra::base64_encode(std::format("{}:{}", conf.GetUserAccount(), conf.GetUserPassword()));
+            cinatra::base64_encode(std::format("{}:{}", conf.GetWebDavUser(), conf.GetWebDavVerification()));
 
         if (client_base64 != server_base64)
         {

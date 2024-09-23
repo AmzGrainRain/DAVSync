@@ -34,8 +34,20 @@ MemoryFileLockService::MemoryFileLockService()
 {
     const auto& conf = ConfigReader::GetInstance();
     const auto& data_path = conf.GetLockData();
+    const bool reset = conf.GetWebDavResetLock();
 
-    if (std::filesystem::exists(data_path))
+    if (reset)
+    {
+        if(std::filesystem::exists(data_path))
+        {
+            if (!std::filesystem::remove(data_path))
+            {
+                spdlog::warn("Unable to clear file lock cache.");
+            }
+        }
+    }
+
+    if (std::filesystem::exists(data_path) && !reset)
     {
         std::ifstream ifs{data_path, std::ios::in};
         if (!ifs.is_open())
@@ -115,6 +127,7 @@ bool MemoryFileLockService::Lock(const std::filesystem::path& path, FileLockType
 
     FileLockMapValueT value{type, expire_time.count()};
     lock_map_.insert({FileLockMapKeyT{path}, std::move(value)});
+    return true;
 }
 
 bool MemoryFileLockService::Unlock(const std::filesystem::path& path)

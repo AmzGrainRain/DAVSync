@@ -16,45 +16,25 @@
 #include "ConfigReader.h"
 #include "utils/path.h"
 
+using namespace utils::redis;
+
 namespace FilePropService
 {
 
-RedisFilePropService::RedisFilePropService()
+RedisFilePropService::RedisFilePropService() : redis_ctx_(nullptr, &redisFree)
 {
     const auto& conf = ConfigReader::GetInstance();
 
-    redis_ctx_ = std::unique_ptr<redisContext>(redisConnect(conf.GetRedisHost().data(), conf.GetRedisPort()));
-    assert(redis_ctx_);
+    redis_ctx_ = GetRedisContext(conf.GetRedisHost(), conf.GetRedisPort());
     if (redis_ctx_->err)
     {
         throw std::runtime_error(redis_ctx_->errstr);
     }
 
-    auth_str_ = std::format("AUTH {} {}", conf.GetRedisUserName(), conf.GetRedisPassword()).data();
-    ReplyT repl{static_cast<redisReply*>(redisCommand(redis_ctx_.get(), auth_str_.data())), &freeReplyObject};
-    assert(repl);
-    if (std::strcmp(repl->str, "OK") != 0)
+    if (!RedisAuth(redis_ctx_.get(), conf.GetRedisUserName(), conf.GetRedisPassword()))
     {
         throw std::runtime_error("Auth failed.");
     }
-}
-
-auto RedisFilePropService::Exec(const std::string& command) -> RedisFilePropService::ReplyT
-{
-    ReplyT repl{static_cast<redisReply*>(redisCommand(redis_ctx_.get(), command.data())), &freeReplyObject};
-    if (!repl)
-    {
-        spdlog::error("Memory allocation error occurred.");
-        throw std::runtime_error("Memory allocation error occurred.");
-    }
-
-    if (redis_ctx_->err)
-    {
-        spdlog::warn(redis_ctx_->errstr);
-        repl.reset();
-    }
-
-    return std::move(repl);
 }
 
 bool RedisFilePropService::Set(const std::filesystem::path& path, const std::pair<std::string, std::string>& prop)
@@ -62,7 +42,7 @@ bool RedisFilePropService::Set(const std::filesystem::path& path, const std::pai
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format(R"(HSET prop:{} {} "{}")", path_str, prop.first, prop.second);
 
-    ReplyT repl = Exec(command);
+    RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl)
     {
         return false;
@@ -76,7 +56,7 @@ std::string RedisFilePropService::Get(const std::filesystem::path& path, const s
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format("HGET prop:{} {}", path_str, key);
 
-    ReplyT repl = Exec(command);
+    RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl)
     {
         return {""};
@@ -90,7 +70,7 @@ std::vector<PropT> RedisFilePropService::GetAll(const std::filesystem::path& pat
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format("HGETALL prop:{}", path_str);
 
-    ReplyT repl = Exec(command);
+    RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl)
     {
         return {};
@@ -110,7 +90,7 @@ bool RedisFilePropService::Remove(const std::filesystem::path& path, const std::
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format("HDEL prop:{} {}", path_str, key);
 
-    ReplyT repl = Exec(command);
+    RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl)
     {
         return false;
@@ -124,7 +104,7 @@ bool RedisFilePropService::RemoveAll(const std::filesystem::path& path)
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format("DEL prop:{}", path_str);
 
-    ReplyT repl = Exec(command);
+    RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl)
     {
         return false;

@@ -1,5 +1,6 @@
 #include "SQLiteFileETagService.h"
 
+#include <entity.hpp>
 #include <format>
 #include <spdlog/spdlog.h>
 
@@ -11,8 +12,7 @@
 namespace FileETagService
 {
 
-REGISTER_AUTO_KEY(FileETagTable, id)
-REFLECTION(FileETagTable, path, sha, id)
+REFLECTION(FileETagTable, path, sha)
 
 SQLiteFileETagService::SQLiteFileETagService()
 {
@@ -24,7 +24,7 @@ SQLiteFileETagService::SQLiteFileETagService()
         throw std::runtime_error(dbng_.get_last_error());
     }
 
-    if (!dbng_.create_datatable<FileETagTable>(ormpp_auto_key{"id"}, ormpp_unique{{"path"}}))
+    if (!dbng_.create_datatable<FileETagTable>(ormpp_key{"path"}))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }

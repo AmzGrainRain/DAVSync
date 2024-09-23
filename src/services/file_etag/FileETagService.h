@@ -12,7 +12,6 @@ struct FileETagTable
 {
   std::string path;
   std::string sha;
-  size_t id;
 };
 
 class FileETagService
