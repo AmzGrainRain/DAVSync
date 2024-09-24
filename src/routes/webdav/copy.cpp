@@ -25,8 +25,6 @@ void COPY(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
-    // TODO: LOCK
-
     const std::string_view& dest_header = req.get_header_value("Destination");
     if (dest_header.empty())
     {
