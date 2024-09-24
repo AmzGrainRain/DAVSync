@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "ConfigReader.h"
+#include "services/FileLockServiceFactory.h"
 #include "utils/webdav.h"
 
 namespace Routes::WebDAV
@@ -21,7 +22,12 @@ void DEL(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
-    // TODO: LOCK
+    auto& lock = FileLockService::GetService();
+    if (lock.IsLocked(abs_path))
+    {
+        res.set_status(cinatra::status_type::locked);
+        return;
+    }
 
     try
     {
