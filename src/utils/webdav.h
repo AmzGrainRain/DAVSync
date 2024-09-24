@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <optional>
 #include <stack>
 #include <string_view>
 
@@ -21,7 +20,5 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, const std::file
 
 auto uri_to_absolute(const std::filesystem::path& webdav_abslute_data_path, const std::string& webdav_prefix,
                      const std::string_view& uri) -> std::filesystem::path;
-
-auto compute_etag(const std::filesystem::path& file_path) -> std::optional<std::string>;
 
 } // namespace utils::webdav

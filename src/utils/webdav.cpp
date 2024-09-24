@@ -133,19 +133,4 @@ auto uri_to_absolute(const std::filesystem::path& webdav_abslute_data_path, cons
     return (webdav_abslute_data_path / uri_str).lexically_normal();
 }
 
-std::optional<std::string> compute_etag(const std::filesystem::path& file_path)
-{
-    std::lock_guard<std::mutex> LOCK(utils_webdav_ComputeEtag_LOCK);
-
-    std::ifstream ifs(file_path, std::ios::binary);
-    if (!ifs.is_open())
-    {
-        return std::nullopt;
-    }
-
-    std::vector<uint8_t> buffer(picosha2::k_digest_size);
-    picosha2::hash256(ifs, buffer.begin(), buffer.end());
-    return picosha2::bytes_to_hex_string(buffer.begin(), buffer.end());
-}
-
 } // namespace utils::webdav

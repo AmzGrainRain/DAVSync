@@ -12,6 +12,7 @@
 #include <pugixml.hpp>
 
 #include "ConfigReader.h"
+#include "services/FileETagServiceFactory.h"
 #include "utils/webdav.h"
 
 inline std::string GenerateMultiStatus(const std::filesystem::path& dir)
@@ -70,8 +71,6 @@ void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
-    // TODO: LOCK
-
     if (fs::is_directory(abs_path))
     {
         res.set_status(cinatra::status_type::bad_request);
@@ -84,8 +83,9 @@ void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
         return;
     }
 
-    auto server_etag = utils::webdav::compute_etag(abs_path);
-    if (!server_etag)
+    auto& etag_service = FileETagService::GetService();
+    std::string etag = etag_service.Set(abs_path);
+    if (!etag.empty())
     {
         res.set_status(cinatra::status_type::internal_server_error);
         return;
@@ -96,9 +96,9 @@ void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
     //  2. When the request header has "If-None-Match", and its value does
     //     not match the ETag computed by the server.
     const std::string_view& client_etag = req.get_header_value("If-None-Match");
-    if (client_etag.empty() || client_etag != server_etag.value())
+    if (client_etag.empty() || client_etag != etag)
     {
-        res.add_header("ETag", server_etag.value());
+        res.add_header("ETag", etag);
         async_simple::coro::syncAwait(SendFile(res, abs_path));
         return;
     }
