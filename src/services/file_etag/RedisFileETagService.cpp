@@ -47,7 +47,7 @@ std::string RedisFileETagService::Get(const std::filesystem::path& path)
     return {repl->str};
 }
 
-bool RedisFileETagService::Set(const std::filesystem::path& path)
+std::string RedisFileETagService::Set(const std::filesystem::path& path)
 {
     const std::string path_str = utils::path::to_string(path);
     std::string sha{};
@@ -62,17 +62,17 @@ bool RedisFileETagService::Set(const std::filesystem::path& path)
     else
     {
         LOG_WARN("Unexpected file type.")
-        return false;
+        return {""};
     }
 
     const std::string command = std::format(R"(SET etag:{} "{}")", path_str, sha);
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
-    if (!repl)
+    if (!repl || repl->integer != 1)
     {
-        return false;
+        return {""};
     }
 
-    return repl->integer == 1;
+    return sha;
 }
 
 } // namespace FileETagService

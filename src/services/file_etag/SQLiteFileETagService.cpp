@@ -2,10 +2,11 @@
 
 #include <format>
 
-#include "logger.hpp"
 #include "ConfigReader.h"
+#include "logger.hpp"
 #include "utils.h"
 #include "utils/path.h"
+
 
 namespace FileETagService
 {
@@ -41,7 +42,7 @@ std::string SQLiteFileETagService::Get(const std::filesystem::path& path)
     return query_res[0].sha;
 }
 
-bool SQLiteFileETagService::Set(const std::filesystem::path& path)
+std::string SQLiteFileETagService::Set(const std::filesystem::path& path)
 {
     std::string path_str = utils::path::to_string(path);
     {
@@ -68,10 +69,16 @@ bool SQLiteFileETagService::Set(const std::filesystem::path& path)
     else
     {
         LOG_WARN("Unexpected file type.")
-        return false;
+        return {""};
     }
 
-    return dbng_.insert<FileETagTable>({std::move(path_str), std::move(sha)}) == 1;
+    if (dbng_.insert<FileETagTable>({std::move(path_str), sha}) != 1)
+    {
+        LOG_ERROR("Data insertion error.");
+        return {""};
+    }
+
+    return sha;
 }
 
 } // namespace FileETagService

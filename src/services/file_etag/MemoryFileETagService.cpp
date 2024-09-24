@@ -86,7 +86,7 @@ std::string MemoryFileETagService::Get(const std::filesystem::path& path)
     return {it->second};
 }
 
-bool MemoryFileETagService::Set(const std::filesystem::path& path)
+std::string MemoryFileETagService::Set(const std::filesystem::path& path)
 {
     try
     {
@@ -108,16 +108,16 @@ bool MemoryFileETagService::Set(const std::filesystem::path& path)
         else
         {
             LOG_WARN("Unexpected file type.")
-            return false;
+            return {""};
         }
 
-        etag_map_.insert({path, std::move(sha)});
-        return true;
+        etag_map_.insert({path, sha});
+        return sha;
     }
     catch (const std::exception& err)
     {
         LOG_ERROR(err.what())
-        return false;
+        return {""};
     }
 }
 

@@ -18,7 +18,7 @@ class FileETagService
 {
   public:
     virtual std::string Get(const std::filesystem::path& path) = 0;
-    virtual bool Set(const std::filesystem::path& path) = 0;
+    virtual std::string Set(const std::filesystem::path& path) = 0;
 };
 
 } // namespace FileETagService
