@@ -11,10 +11,12 @@ class SQLiteFileLockService : public FileLockService
   public:
     SQLiteFileLockService();
 
-    bool Lock(const std::filesystem::path& path, FileLockType type = FileLockType::SHARED,
-              std::chrono::seconds expire_time = std::chrono::seconds{0}) override;
+    bool Lock(const std::string& token, const std::filesystem::path& path, int8_t depth, FileLockType type,
+              std::chrono::seconds expire_ts) override;
 
-    bool Unlock(const std::filesystem::path& path) override;
+    bool Unlock(const std::string& token) override;
+
+    bool IsLocked(const std::string& token) override;
 
     bool IsLocked(const std::filesystem::path& path) override;
 

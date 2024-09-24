@@ -3,6 +3,7 @@
 #include <chrono>
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 
 #include <hiredis/hiredis.h>
 
@@ -16,16 +17,19 @@ class RedisFileLockService : public FileLockService
   public:
     RedisFileLockService();
 
-    bool Lock(const std::filesystem::path& path, FileLockType type = FileLockType::SHARED,
-              std::chrono::seconds expire_time = std::chrono::seconds{0}) override;
+    bool Lock(const std::string& token, const std::filesystem::path& path, int8_t depth, FileLockType type,
+              std::chrono::seconds expire_ts) override;
 
-    bool Unlock(const std::filesystem::path& path) override;
+    bool Unlock(const std::string& token) override;
+
+    bool IsLocked(const std::string& token) override;
 
     bool IsLocked(const std::filesystem::path& path) override;
 
   private:
     std::string auth_str_;
     utils::redis::RedisContextT redis_ctx_;
+    std::unordered_map<std::filesystem::path, std::string> token_map_;
 };
 
 } // namespace FileLockService
