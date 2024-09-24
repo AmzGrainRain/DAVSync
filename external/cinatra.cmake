@@ -9,7 +9,7 @@ set_target_properties(cinatra-headers PROPERTIES
     CXX_STANDARD ${cinatra-CXX_STANDARD}
     CXX_STANDARD_REQUIRED ON
 )
-target_include_directories(cinatra-headers SYSTEM INTERFACE ${CMAKE_SOURCE_DIR}/external/cinatra/include)
+target_include_directories(cinatra-headers SYSTEM INTERFACE cinatra/include)
 
 # --------------------- Msvc
 if (MSVC)

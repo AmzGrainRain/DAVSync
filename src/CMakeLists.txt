@@ -7,18 +7,18 @@ file(GLOB_RECURSE SOURCE_LIST
     ${PROJECT_SOURCE_DIR}/*.cpp
 )
 
-find_package(libpqxx CONFIG REQUIRED)
-
 add_executable(${PROJECT_NAME} ${SOURCE_LIST})
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/external/ormpp/thirdparty/sqlite3
+)
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    # spdlog::spdlog
-    cinatra::headers
     inih::static
+    cinatra::headers
     ormpp::headers
+    hiredis::hiredis
     pugixml::static
     picosha2::static
-    hiredis::hiredis
 )
 
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC")

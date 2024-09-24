@@ -1,7 +1,6 @@
 set(pugixml-CXX_STANDARD 11)
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/external/pugixml)
-include_directories(${CMAKE_SOURCE_DIR}/external/pugixml/src)
+add_subdirectory(pugixml)
 set_target_properties(pugixml-static PROPERTIES
     CXX_STANDARD ${pugixml-CXX_STANDARD}
     CXX_STANDARD_REQUIRED ON

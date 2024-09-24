@@ -21,7 +21,7 @@ SQLiteFileLockService::SQLiteFileLockService()
     using namespace ormpp;
     const auto& conf = ConfigReader::GetInstance();
 
-    if (!dbng_.connect(conf.GetSQLiteDB()))
+    if (!dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "FileLock"))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }

@@ -18,7 +18,7 @@ inline std::string GenerateMultiStatus(const std::filesystem::path& dir)
 {
     const auto& conf = ConfigReader::GetInstance();
     pugi::xml_document xml_doc;
-    utils::webdav::generate_multistatus(xml_doc, conf.GetSSLEnabled(), conf.GetHttpHost());
+    utils::webdav::generate_multistatus(xml_doc, conf.GetHttpsEnabled(), conf.GetHttpHost());
     utils::webdav::generate_response_list(xml_doc, dir);
     std::ostringstream oss;
     xml_doc.save(oss);

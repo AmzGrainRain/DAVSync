@@ -1,9 +1,9 @@
 set(inih-CXX_STANDARD 17)
 file(GLOB_RECURSE inih_SOURCE_LIST
-    ${CMAKE_SOURCE_DIR}/external/inih/ini.c
-    ${CMAKE_SOURCE_DIR}/external/inih/ini.h
-    ${CMAKE_SOURCE_DIR}/external/inih/cpp/INIReader.h
-    ${CMAKE_SOURCE_DIR}/external/inih/cpp/INIReader.cpp
+    inih/ini.c
+    inih/ini.h
+    inih/cpp/INIReader.h
+    inih/cpp/INIReader.cpp
 )
 
 add_library(inih-static STATIC ${inih_SOURCE_LIST})

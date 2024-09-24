@@ -15,16 +15,11 @@ if(WIN32)
 endif()
 
 # vcpkg
-find_package(libpqxx CONFIG REQUIRED)
 find_package(hiredis CONFIG REQUIRED)
 
 # external
+add_subdirectory(external)
 include_directories(external)
-include(external/inih.cmake)
-include(external/cinatra.cmake)
-include(external/ormpp.cmake)
-include(external/pugixml.cmake)
-include(external/picosha2.cmake)
 
 # src
 add_subdirectory(src)

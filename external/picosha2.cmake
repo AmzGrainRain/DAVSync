@@ -1,6 +1,6 @@
 set(picosha2-CXX_STANDARD 17)
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/external/PicoSHA2)
+add_subdirectory(PicoSHA2)
 add_library(picosha2::static ALIAS picosha2)
 set_target_properties(picosha2 PROPERTIES
     CXX_STANDARD ${picosha2-CXX_STANDARD}
