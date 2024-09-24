@@ -2,15 +2,16 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <spdlog/spdlog.h>
-
 #include "ConfigReader.h"
-#include "FilePropService.h"
+#include "logger.hpp"
+#include "utils/path.h"
 #include "utils/string.h"
 
 namespace FilePropService
@@ -20,13 +21,14 @@ MemoryFilePropService::MemoryFilePropService()
 {
     const auto& conf = ConfigReader::GetInstance();
     const auto& data_path = conf.GetPropData();
+    const std::string data_path_str = utils::path::to_string(data_path);
 
     if (std::filesystem::exists(data_path))
     {
         std::ifstream ifs{data_path, std::ios::in};
         if (!ifs.is_open())
         {
-            spdlog::warn("Unable to open '{}', unable to recover file properties.", data_path.string());
+            LOG_ERROR_FMT("Unable to open '{}', unable to recover file properties.", data_path_str);
             return;
         }
 
@@ -88,8 +90,8 @@ MemoryFilePropService::MemoryFilePropService()
     data_.open(data_path, std::ios::out);
     if (!data_.is_open())
     {
-        spdlog::warn("Unable to save file properties to '{}', file properties are lost when the server stops.",
-                     data_path.string());
+        LOG_ERROR_FMT("Unable to save file properties to '{}', file properties are lost when the server stops.",
+                      data_path_str);
     }
 }
 
@@ -119,7 +121,7 @@ MemoryFilePropService::~MemoryFilePropService()
     }
 
     const auto& conf = ConfigReader::GetInstance();
-    spdlog::info("The file attributes have been saved to {}", conf.GetPropData().string());
+    LOG_ERROR_FMT("The file attributes have been saved to {}", utils::path::to_string(conf.GetPropData()));
 }
 
 bool MemoryFilePropService::Set(const std::filesystem::path& path, const PropT& prop)

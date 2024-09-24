@@ -1,10 +1,13 @@
 #include "BasicAuth.h"
 
 #include <format>
+#include <string>
+#include <utility>
 #include <vector>
 
-#include <cinatra/utils.hpp>
 #include "ConfigReader.h"
+#include "logger.hpp"
+#include "utils.h"
 #include "utils/string.h"
 
 inline static void RequestVerification(cinatra::coro_http_response& res) noexcept
@@ -16,10 +19,13 @@ inline static void RequestVerification(cinatra::coro_http_response& res) noexcep
     res.set_status(cinatra::status_type::unauthorized);
 }
 
-inline static std::string ParseAuthorization(const std::string_view& text_view) noexcept
+inline static auto ParseAuthorization(const std::string_view& text_view) noexcept -> std::pair<std::string, std::string>
 {
-    const std::string text{text_view};
-    return utils::string::split(text, " ")[1];
+    // text_view just like: "Basic dXNlcjpwYXNzd29yZA=="
+    std::string encoded_base64{utils::string::split(text_view, ' ')[1]};
+    const std::string decoded_base64 = utils::base64_decode(encoded_base64);
+
+    return utils::string::split2pair(decoded_base64, ':');
 }
 
 namespace Section
@@ -43,24 +49,22 @@ bool BasicAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_respo
         }
 
         const auto& conf = ConfigReader::GetInstance();
-        const auto client_base64 = ParseAuthorization(authorization);
-        auto server_base64 =
-            cinatra::base64_encode(std::format("{}:{}", conf.GetWebDavUser(), conf.GetWebDavVerification()));
-
-        if (client_base64 != server_base64)
+        const auto client_user = ParseAuthorization(authorization);
+        const std::string serverside_user_password = conf.GetWebDavUser(client_user.first);
+        if (serverside_user_password.empty() || client_user.second != serverside_user_password)
         {
             RequestVerification(res);
             return false;
         }
+
+        return true;
     }
     catch (const std::exception& err)
     {
-        std::cout << std::format("[{}:{}] {}", __FILE__, __LINE__, err.what());
+        LOG_ERROR(err.what())
         res.set_status(cinatra::status_type::bad_request);
         return false;
     }
-
-    return true;
 }
 
 bool BasicAuth::after(cinatra::coro_http_request& req, cinatra::coro_http_response& res)

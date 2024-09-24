@@ -1,12 +1,13 @@
 #include "RedisFileETagService.h"
 
 #include <cassert>
-
 #include <format>
+#include <iostream>
+
 #include <hiredis/hiredis.h>
-#include <spdlog/spdlog.h>
 
 #include "ConfigReader.h"
+#include "logger.hpp"
 #include "utils.h"
 #include "utils/path.h"
 #include "utils/redis.h"
@@ -60,7 +61,8 @@ bool RedisFileETagService::Set(const std::filesystem::path& path)
     }
     else
     {
-        throw std::runtime_error("Unexpected file type.");
+        LOG_WARN("Unexpected file type.")
+        return false;
     }
 
     const std::string command = std::format(R"(SET etag:{} "{}")", path_str, sha);

@@ -51,7 +51,7 @@ void PROPFIND(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 
     pugi::xml_document xml_doc;
     pugi::xml_node multistatus =
-        utils::webdav::generate_multistatus(xml_doc, conf.GetRedisEnable(), conf.GetRedisHost());
+        utils::webdav::generate_multistatus(xml_doc, conf.GetHttpsEnabled(), conf.GetHttpHost());
     utils::webdav::generate_response_list_recurse(multistatus, abs_path, depth);
     std::ostringstream oss;
     xml_doc.save(oss);

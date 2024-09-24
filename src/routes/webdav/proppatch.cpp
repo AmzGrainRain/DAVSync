@@ -1,9 +1,10 @@
 #include "proppatch.h"
 #include <cstring>
 #include <exception>
-#include <iostream>
 
 #include <pugixml.hpp>
+
+#include "logger.hpp"
 
 namespace Routes::WebDAV
 {
@@ -17,7 +18,8 @@ void PROPPATCH(cinatra::coro_http_request& req, cinatra::coro_http_response& res
         return;
     }
 
-    try {
+    try
+    {
         pugi::xml_document doc;
         if (!doc.load_string(body.data()))
         {
@@ -32,7 +34,8 @@ void PROPPATCH(cinatra::coro_http_request& req, cinatra::coro_http_response& res
             return;
         }
 
-        for (auto prop_node : root_node.children()) {
+        for (auto prop_node : root_node.children())
+        {
             if (std::strcmp(prop_node.name(), "D:set") == 0)
             {
                 // TODO
@@ -45,8 +48,10 @@ void PROPPATCH(cinatra::coro_http_request& req, cinatra::coro_http_response& res
 
         res.set_status(cinatra::status_type::ok);
         return;
-    } catch (const std::exception& err) {
-        std::cout << err.what() << std::endl;
+    }
+    catch (const std::exception& err)
+    {
+        LOG_ERROR(err.what())
         res.set_status(cinatra::status_type::internal_server_error);
         return;
     }

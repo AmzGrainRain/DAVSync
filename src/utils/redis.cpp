@@ -1,7 +1,9 @@
 #include "redis.h"
 
 #include <hiredis/hiredis.h>
-#include <spdlog/spdlog.h>
+
+#include <stdexcept>
+#include <format>
 
 namespace utils::redis
 {
@@ -16,13 +18,12 @@ auto RedisExecute(redisContext* ctx, const std::string& command) -> RedisReplyT
     RedisReplyT repl{static_cast<redisReply*>(redisCommand(ctx, command.data())), &freeReplyObject};
     if (!repl)
     {
-        spdlog::error("Memory allocation error occurred.");
         throw std::runtime_error("Memory allocation error occurred.");
     }
 
     if (ctx->err)
     {
-        spdlog::error(ctx->errstr);
+        throw std::runtime_error(ctx->errstr);
         repl.reset();
     }
 

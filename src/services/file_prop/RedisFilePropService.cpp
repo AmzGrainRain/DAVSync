@@ -11,8 +11,8 @@
 #include <vector>
 
 #include <hiredis/hiredis.h>
-#include <spdlog/spdlog.h>
 
+#include "logger.hpp"
 #include "ConfigReader.h"
 #include "utils/path.h"
 

@@ -1,13 +1,12 @@
 #include <async_simple/Future.h>
 #include <exception>
 
-#include <spdlog/spdlog.h>
-
 #include <cinatra/coro_http_request.hpp>
 #include <cinatra/coro_http_response.hpp>
 #include <cinatra/coro_http_server.hpp>
 #include <pugixml.hpp>
 
+#include "logger.hpp"
 #include "section/BasicAuth.h"
 #include "section/DigestAuth.h"
 
@@ -86,9 +85,8 @@ int main()
             app.set_http_handler<MOVE>(webdav_prefix, R::MOVE);
             app.set_http_handler<LOCK>(webdav_prefix, R::LOCK);
             app.set_http_handler<UNLOCK>(webdav_prefix, R::UNLOCK);
-            spdlog::warn(
-                "It seems that you have not set any security verification for the webdav server, which means that "
-                "anyone can directly modify your files without any verification.");
+            LOG_WARN("It seems that you have not set any security verification for the webdav server, which means that "
+                     "anyone can directly modify your files without any verification.")
         }
 
         app.set_http_handler<GET>("/", [](coro_http_request& req, coro_http_response& res) -> void {
@@ -96,14 +94,14 @@ int main()
             res.set_status_and_content(status_type::ok, "<h1>The server has been started.</h1>");
         });
 
-        spdlog::info("Server running at {}://{}:{}", conf.GetHttpsEnabled() ? "https" : "http", conf.GetHttpHost(),
-                     conf.GetHttpsEnabled() ? conf.GetHttpsPort() : conf.GetHttpPort());
+        LOG_INFO_FMT("Server running at {}://{}:{}", conf.GetHttpsEnabled() ? "https" : "http", conf.GetHttpHost(),
+                 conf.GetHttpsEnabled() ? conf.GetHttpsPort() : conf.GetHttpPort());
 
         return app.sync_start().value();
     }
     catch (const std::exception& err)
     {
-        spdlog::error(err);
+        LOG_ERROR(err.what())
         return -1;
     }
 }

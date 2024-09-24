@@ -4,9 +4,9 @@
 #include <filesystem>
 #include <format>
 
-#include <spdlog/spdlog.h>
 #include <vector>
 
+#include "logger.hpp"
 #include "ConfigReader.h"
 #include "FilePropService.h"
 #include "utils/path.h"
@@ -45,7 +45,7 @@ std::string SQLiteFilePropService::Get(const std::filesystem::path& path, const 
     const auto query_res = dbng_.query_s<FilePropTable>(std::format("path='{}' and key='{}'", path_str, key));
     if (query_res.size() != 1)
     {
-        spdlog::error("The database may be damaged.");
+        LOG_ERROR("The database may be damaged.");
         return {""};
     }
 

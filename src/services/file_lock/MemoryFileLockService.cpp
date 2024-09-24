@@ -4,11 +4,11 @@
 #include <cstddef>
 #include <exception>
 #include <filesystem>
-#include <spdlog/spdlog.h>
 #include <string>
 #include <string_view>
 #include <utility>
 
+#include "logger.hpp"
 #include "ConfigReader.h"
 #include "FileLockService.h"
 #include "utils/path.h"
@@ -34,6 +34,7 @@ MemoryFileLockService::MemoryFileLockService()
 {
     const auto& conf = ConfigReader::GetInstance();
     const auto& data_path = conf.GetLockData();
+    const std::string data_path_str = utils::path::to_string(data_path);
     const bool reset = conf.GetWebDavResetLock();
 
     if (reset)
@@ -42,7 +43,7 @@ MemoryFileLockService::MemoryFileLockService()
         {
             if (!std::filesystem::remove(data_path))
             {
-                spdlog::warn("Unable to clear file lock cache.");
+                LOG_ERROR("Unable to clear file lock cache.");
             }
         }
     }
@@ -52,7 +53,7 @@ MemoryFileLockService::MemoryFileLockService()
         std::ifstream ifs{data_path, std::ios::in};
         if (!ifs.is_open())
         {
-            spdlog::warn("Unable to open '{}', unable to recover file lock cache.", data_path.string());
+            LOG_ERROR_FMT("Unable to open '{}', unable to recover file lock cache.", data_path_str)
             return;
         }
 
@@ -89,8 +90,8 @@ MemoryFileLockService::MemoryFileLockService()
             }
             catch (const std::exception& err)
             {
-                spdlog::warn("The file lock cache may be damaged.");
-                spdlog::warn(err);
+                LOG_ERROR("The file lock cache may be damaged.");
+                LOG_ERROR(err.what());
             }
         }
     }
@@ -98,8 +99,8 @@ MemoryFileLockService::MemoryFileLockService()
     data_.open(data_path, std::ios::out);
     if (!data_.is_open())
     {
-        spdlog::warn("Unable to save file lock cache to '{}', file lock cache are lost when the server stops.",
-                     data_path.string());
+        LOG_ERROR_FMT("Unable to save file lock cache to '{}', file lock cache are lost when the server stops.",
+                     data_path_str);
     }
 }
 
@@ -115,7 +116,7 @@ MemoryFileLockService::~MemoryFileLockService()
     }
 
     const auto& conf = ConfigReader::GetInstance();
-    spdlog::info("The file lock cache have been saved to {}", conf.GetLockData().string());
+    LOG_INFO_FMT("The file lock cache have been saved to {}", utils::path::to_string(conf.GetLockData()));
 }
 
 bool MemoryFileLockService::Lock(const std::filesystem::path& path, FileLockType type, std::chrono::seconds expire_time)

@@ -2,14 +2,14 @@
 
 #include <exception>
 #include <filesystem>
-#include <stdexcept>
+#include <format>
+#include <iostream>
 #include <string>
 #include <string_view>
-
-#include <spdlog/spdlog.h>
 #include <utility>
 
 #include "ConfigReader.h"
+#include "logger.hpp"
 #include "utils.h"
 #include "utils/path.h"
 
@@ -20,13 +20,14 @@ MemoryFileETagService::MemoryFileETagService()
 {
     const auto& conf = ConfigReader::GetInstance();
     const auto& data_path = conf.GetETagData();
+    const std::string data_path_str = utils::path::to_string(data_path);
 
     if (std::filesystem::exists(data_path))
     {
         std::ifstream ifs{data_path, std::ios::in};
         if (!ifs.is_open())
         {
-            spdlog::warn("Unable to open '{}', unable to recover file etags.", data_path.string());
+            LOG_ERROR_FMT("Unable to open '{}', unable to recover file etags.", data_path_str)
             return;
         }
 
@@ -55,8 +56,8 @@ MemoryFileETagService::MemoryFileETagService()
     data_.open(data_path, std::ios::out);
     if (!data_.is_open())
     {
-        spdlog::warn("Unable to save file etag to '{}', file properties are lost when the server stops.",
-                     data_path.string());
+        LOG_ERROR_FMT("Unable to save file etag to '{}', file properties are lost when the server stops.",
+                      data_path_str)
     }
 }
 
@@ -71,7 +72,7 @@ MemoryFileETagService::~MemoryFileETagService()
     }
 
     const auto& conf = ConfigReader::GetInstance();
-    spdlog::info("The file etag have been saved to {}", conf.GetETagData().string());
+    LOG_INFO_FMT("The file etag have been saved to {}", utils::path::to_string(conf.GetETagData()))
 }
 
 std::string MemoryFileETagService::Get(const std::filesystem::path& path)
@@ -106,7 +107,8 @@ bool MemoryFileETagService::Set(const std::filesystem::path& path)
         }
         else
         {
-            throw std::runtime_error("Unexpected file type.");
+            LOG_WARN("Unexpected file type.")
+            return false;
         }
 
         etag_map_.insert({path, std::move(sha)});
@@ -114,7 +116,7 @@ bool MemoryFileETagService::Set(const std::filesystem::path& path)
     }
     catch (const std::exception& err)
     {
-        spdlog::warn(err);
+        LOG_ERROR(err.what())
         return false;
     }
 }

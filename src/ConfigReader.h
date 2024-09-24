@@ -36,7 +36,7 @@ class ConfigReader
     int8_t GetWebDavMaxRecurseDepth() const noexcept;
     const std::string& GetWebDavRealm() const noexcept;
     const std::string& GetWebDavVerification() const noexcept;
-    auto GetWebDavUser() const noexcept -> const std::unordered_map<std::string, std::string>&;
+    std::string GetWebDavUser(const std::string& user) const noexcept;
     bool GetWebDavResetLock() const noexcept;
 
     const std::string& GetRedisHost() const noexcept;

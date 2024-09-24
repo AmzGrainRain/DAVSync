@@ -5,7 +5,6 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
@@ -14,67 +13,227 @@
 #include <inih/cpp/INIReader.h>
 
 #include "ConfigReader.h"
+#include "logger.hpp"
 #include "utils/path.h"
+#include "utils/string.h"
 
-static inline void user_parse(std::unordered_map<std::string, std::string>& users, const std::string_view& str)
+static inline void ParseHttpConfig(INIReader& ini, std::string& host, std::string& address, uint16_t& port,
+                                   size_t& buffer_size, uint16_t& max_thread)
 {
-    auto pos = str.find_last_of(':');
-    if (pos == std::string_view::npos)
+    // host
+    host = ini.GetString("http", "host", "127.0.0.1");
+    assert(!host.empty() && "[http.host] Illegal host");
+
+    // address
+    address = ini.GetString("http", "address", "0.0.0.0");
+    assert(!address.empty() && "[http.address] Illegal address");
+
+    // port
+    long _http_port = ini.GetInteger("http", "port", 8110);
+    assert(std::in_range<uint16_t>(_http_port) && "[http.port] Must be within the range of [0-65535]");
+    port = static_cast<uint16_t>(_http_port);
+
+    // buffer size
+    buffer_size = static_cast<size_t>(ini.GetUnsigned64("http", "buffer-size", 1024));
+    assert((buffer_size >= 1024) && "[http.buffer-size] Must be >= 1024");
+
+    // thread number
+    long _max_thread = ini.GetInteger("http", "max_thread", 0);
+    assert(std::in_range<uint16_t>(_max_thread) && "[http.max-thread] Must be within the range of [0-65535]");
+    max_thread = static_cast<uint16_t>(_max_thread);
+    if (max_thread == 0)
     {
-        return;
+        max_thread = std::thread::hardware_concurrency();
+    }
+}
+
+static inline void ParseHttpsConfig(INIReader& ini, bool& enable, uint16_t& port, bool& only,
+                                    std::filesystem::path& cert, std::filesystem::path& key)
+{
+    // https enable
+    enable = ini.GetBoolean("https", "enable", "false");
+    {
+        long https_port = ini.GetInteger("https", "port", 8111);
+        assert(std::in_range<uint16_t>(https_port) && "[https.port] Must be within the range of [0-65535]");
+        port = static_cast<uint16_t>(https_port);
     }
 
-    users.emplace(std::string{str.substr(0, pos)}, std::string{str.substr(pos + 1)});
+    // https only
+    only = ini.GetBoolean("https", "https-only", true);
+
+    // https cert
+    cert = ini.GetString("ssl", "cert", "");
+
+    // https key
+    key = ini.GetString("ssl", "key", "");
+
+    if (enable)
+    {
+        assert(std::filesystem::is_regular_file(cert) && "[ssl.cert] Not exist");
+        assert(std::filesystem::is_regular_file(key) && "[ssl.key] Not exist");
+    }
+}
+
+static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::string& route_prefix,
+                                     std::filesystem::path& absolute_data_path,
+                                     std::filesystem::path& relative_data_path, int8_t& max_recurse_depth,
+                                     std::string& realm, std::string& verification,
+                                     std::unordered_map<std::string, std::string>& users, bool& reset_lock)
+{
+    // webdav prefix
+    prefix = ini.GetString("webdav", "prefix", "./webdav");
+    assert(!prefix.empty() && "[webdav.prefix] Cannot be empty");
+    {
+        char c = prefix.back();
+        assert((c >= 65 && c <= 90) || (c >= 97 && c <= 122) && "[webdav.prefix] Must end with the [a-Z] character");
+    }
+
+    // webdav route prefix
+    route_prefix = prefix + "/(.*)";
+
+    // webdav data path
+    const auto& cwd = std::filesystem::current_path();
+    std::filesystem::path _data_path = ini.GetString("webdav", "data-path", "data");
+    assert(std::filesystem::exists(_data_path) && "[webdav.data-path] Not exist");
+    assert(std::filesystem::is_directory(_data_path) && "[webdav.data-path] Required directory");
+    if (_data_path.is_absolute())
+    {
+        absolute_data_path = std::move(_data_path);
+        relative_data_path = std::filesystem::relative(absolute_data_path, cwd).lexically_normal();
+    }
+    else
+    {
+        relative_data_path = std::move(_data_path);
+        absolute_data_path = (cwd / relative_data_path).lexically_normal();
+    }
+
+    // webdav propfind max recurse depth
+    long _max_recurse_depth = ini.GetInteger("webdav", "max-recurse-depth", 4);
+    assert(std::in_range<int8_t>(_max_recurse_depth) &&
+           "[webdav.max-recurse-depth] Must be within the range of [0-255]");
+    max_recurse_depth = static_cast<int8_t>(_max_recurse_depth);
+
+    // webdav auth realm
+    realm = ini.GetString("webdav", "realm", "WebDavRealm");
+    assert(!realm.empty() && "[webdav.realm] Cannot be empty");
+
+    // webdav verification type
+    verification = ini.GetString("wevdav", "verification", "none");
+    assert((verification == "basic" || verification == "digest" || verification == "none") &&
+           "[webdav.verification] Must be one of them [basic|digest|none]");
+
+    // webdav user list
+    const std::string user_list_raw = ini.GetString("webdav", "users", "");
+    for (const auto& user : utils::string::split(user_list_raw, ','))
+    {
+        users.emplace(utils::string::split2pair(user, '@'));
+    }
+
+    // reset file lock during webdav server startup
+    reset_lock = ini.GetBoolean("webdav", "reset-lock", true);
+}
+
+static inline void ParseRedisConfig(INIReader& ini, std::string& host, uint16_t& port, std::string& user,
+                                    std::string& passwd)
+{
+    // redis address
+    host = ini.GetString("redis", "host", "localhost");
+
+    // redis port
+    long redis_port = ini.GetInteger("redis", "port", 6379);
+    assert(std::in_range<uint16_t>(redis_port) && "redis port number out of range");
+    port = static_cast<uint16_t>(redis_port);
+
+    // redis user
+    user = ini.GetString("redis", "username", "");
+    assert(!user.empty() && "[redis.username] Cannot be empty");
+
+    // redis password
+    passwd = ini.GetString("redis", "password", "");
+    assert(!passwd.empty() && "[redis.password] Cannot be empty");
+}
+
+static inline void ParseEngineConfig(INIReader& ini, std::string& etag_engine, std::string& lock_engine,
+                                     std::string& prop_engine)
+{
+    std::unordered_set<std::string> engine_list{"memory", "sqlite", "redis"};
+
+    etag_engine = ini.GetString("engine", "etag", "sqlite");
+    assert(engine_list.contains(etag_engine) && "[engine.etag] Must be one of them [memory|sqlite|redis]");
+
+    lock_engine = ini.GetString("engine", "lock", "memory");
+    assert(engine_list.contains(lock_engine) && "[engine.lock] Must be one of them [memory|sqlite|redis]");
+
+    prop_engine = ini.GetString("engine", "prop", "sqlite");
+    assert(engine_list.contains(prop_engine) && "[engine.prop] Must be one of them [memory|sqlite|redis]");
+}
+
+static inline void ParseCacheConfig(INIReader& ini, std::filesystem::path& sqlite_db, std::filesystem::path& etag_data,
+                                    std::filesystem::path& lock_data, std::filesystem::path& prop_data)
+{
+    sqlite_db = ini.GetString("cache", "sqlite-db", "./data.db");
+    etag_data = ini.GetString("cache", "etag-data", "./etag.dat");
+    lock_data = ini.GetString("cache", "lock-data", "./lock.dat");
+    prop_data = ini.GetString("cache", "prop-data", "./prop.dat");
 }
 
 inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::path& file)
 {
-    std::cout << "unable to read configuration file, creating ..." << std::endl;
+    LOG_WARN("unable to read configuration file, creating ...")
 
     std::ofstream ofs(file, std::ios::out);
     if (!ofs.is_open())
     {
-        std::cout << "unable to write default configuration file, please check program permissions and try again."
-                  << std::endl;
+        LOG_ERROR("unable to write default configuration file, please check program permissions and try again.")
         return;
     }
 
-    const std::string default_config = "[http]\n"
-                                       "host = 127.0.0.1\n"
-                                       "address = 0.0.0.0\n"
-                                       "port = 8111\n"
-                                       "buffer_size = 1024\n"
-                                       "max_thread = 0\n\n"
+    ofs << "[http]\n";
+    ofs << "host = 127.0.0.1\n";
+    ofs << "address = 0.0.0.0\n";
+    ofs << "port = 8110\n";
+    ofs << "buffer_size = 1024\n";
+    ofs << "max_thread = 0\n";
+    ofs << '\n';
 
-                                       "[ssl]\n"
-                                       "enable = false\n"
-                                       "cert =./full_chain.pem\n"
-                                       "key =./key.pem\n\n"
+    ofs << "[https]\n";
+    ofs << "enable = false\n";
+    ofs << "port = 8111\n";
+    ofs << "https-only = true\n";
+    ofs << "cert =./full_chain.pem\n";
+    ofs << "key =./key.pem\n";
+    ofs << '\n';
 
-                                       "[webdav]\n"
-                                       "prefix = /webdav\n"
-                                       "root-path = ./data\n"
-                                       "verification = none\n"
-                                       "realm = WebDavRealm\n"
-                                       "max-recurse-depth = 4\n\n"
+    ofs << "[webdav]\n";
+    ofs << "data-path = ./data\n";
+    ofs << "max-recurse-depth = 4\n";
+    ofs << "realm = WebDavRealm\n";
+    ofs << "verification = none\n";
+    ofs << "users = test@admin\n";
+    ofs << "reset-lock = true\n";
+    ofs << '\n';
 
-                                       "[sqlite]\n"
-                                       "enable = true\n"
-                                       "location = ./file_props.db\n\n"
+    ofs << "[redis]\n";
+    ofs << "host = localhost\n";
+    ofs << "port = 6379\n";
+    ofs << "username = default\n";
+    ofs << "password =\n";
+    ofs << '\n';
 
-                                       "[redis]\n"
-                                       "enable = false\n"
-                                       "host = localhost\n"
-                                       "port = 6379\n"
-                                       "auth = \n\n"
+    ofs << "[engine]\n";
+    ofs << "etag = sqlite\n";
+    ofs << "lock = memory\n";
+    ofs << "prop = sqlite\n";
+    ofs << '\n';
 
-                                       "[user]\n"
-                                       "account =\n"
-                                       "password =\n\n";
-    ofs.write(default_config.data(), default_config.size());
+    ofs << "[cache]\n";
+    ofs << "sqlite-db = ./data.db\n";
+    ofs << "etag-data = ./etag.dat\n";
+    ofs << "lock-data = ./lock.dat\n";
+    ofs << "prop-data = ./prop.dat\n";
+
     ofs.flush();
     ofs.close();
-    std::cout << "done." << std::endl;
 }
 
 const ConfigReader& ConfigReader::GetInstance()
@@ -91,152 +250,26 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
     if (!fs::exists(path_string))
     {
         WriteDefaultConfigFile(path);
+        LOG_INFO("Default configuration has been generated, please restart the server.")
     }
 
     INIReader reader(path_string);
     assert(reader.ParseError() == 0 && "Failed to parsing settings.ini");
-
     cwd_ = fs::current_path();
 
-    // === http ==============================================================================
-    http_host_ = reader.GetString("http", "host", "127.0.0.1");
-    assert(!http_host_.empty() && "[http.host] Illegal host");
+    ParseHttpConfig(reader, http_host_, http_address_, http_port_, http_buffer_size_, http_max_thread_);
 
-    http_address_ = reader.GetString("http", "address", "0.0.0.0");
-    assert(!http_address_.empty() && "[http.address] Illegal address");
+    ParseHttpsConfig(reader, https_enable_, https_port_, https_only_, ssl_cert_, ssl_key_);
 
-    {
-        long http_port = reader.GetInteger("http", "port", 8110);
-        assert(std::in_range<uint16_t>(http_port) && "[http.port] Must be within the range of [0-65535]");
-        http_port_ = static_cast<uint16_t>(http_port);
-    }
+    ParseWebDAVConfig(reader, webdav_prefix_, webdav_route_prefix_, webdav_absolute_data_path_,
+                      webdav_relative_data_path_, webdav_max_recurse_depth_, webdav_realm_, webdav_verification_,
+                      webdav_user_, webdav_reset_lock_);
 
-    http_buffer_size_ = static_cast<size_t>(reader.GetUnsigned64("http", "buffer-size", 1024));
-    assert((http_buffer_size_ >= 1024) && "[http.buffer-size] Must be >= 1024");
+    ParseRedisConfig(reader, redis_host_, redis_port_, redis_username_, redis_password_);
 
-    {
-        long http_max_thread = reader.GetInteger("http", "max_thread", 0);
-        assert(std::in_range<uint16_t>(http_max_thread) && "[http.max-thread] Must be within the range of [0-65535]");
-        http_max_thread_ = static_cast<uint16_t>(http_max_thread);
-        if (http_max_thread_ == 0)
-        {
-            http_max_thread_ = std::thread::hardware_concurrency();
-        }
-    }
-    // =======================================================================================
+    ParseEngineConfig(reader, etag_engine_, lock_engine_, prop_engine_);
 
-    // === https =============================================================================
-    https_enable_ = reader.GetBoolean("https", "enable", "false");
-    {
-        long https_port = reader.GetInteger("https", "port", 8111);
-        assert(std::in_range<uint16_t>(https_port) && "[https.port] Must be within the range of [0-65535]");
-        https_port_ = static_cast<uint16_t>(https_port);
-    }
-    https_only_ = reader.GetBoolean("https", "https-only", true);
-    ssl_cert_ = reader.GetString("ssl", "cert", "");
-    ssl_key_ = reader.GetString("ssl", "key", "");
-    if (https_enable_)
-    {
-        assert(std::filesystem::is_regular_file(ssl_cert_) && "[ssl.cert] Not exist");
-        assert(std::filesystem::is_regular_file(ssl_key_) && "[ssl.key] Not exist");
-    }
-    // =======================================================================================
-
-    // === webdav ============================================================================
-    webdav_prefix_ = reader.GetString("webdav", "prefix", "./webdav");
-    assert(!webdav_prefix_.empty() && "[webdav.prefix] Cannot be empty");
-    {
-        char c = webdav_prefix_.back();
-        assert((c >= 65 && c <= 90) || (c >= 97 && c <= 122) && "[webdav.prefix] Must end with the [a-Z] character");
-    }
-
-    webdav_route_prefix_ = webdav_prefix_ + "/(.*)";
-
-    {
-        fs::path data_path = reader.GetString("webdav", "data-path", "data");
-        assert(std::filesystem::exists(data_path) && "[webdav.data-path] Not exist");
-        assert(std::filesystem::is_directory(data_path) && "[webdav.data-path] Required directory");
-        if (data_path.is_absolute())
-        {
-            webdav_absolute_data_path_ = std::move(data_path);
-            webdav_relative_data_path_ = std::filesystem::relative(webdav_absolute_data_path_, cwd_).lexically_normal();
-        }
-        else
-        {
-            webdav_relative_data_path_ = std::move(data_path);
-            webdav_absolute_data_path_ = (cwd_ / webdav_relative_data_path_).lexically_normal();
-        }
-    }
-
-    {
-        long webdav_max_recurse_depth = reader.GetInteger("webdav", "max-recurse-depth", 4);
-        assert(std::in_range<int8_t>(webdav_max_recurse_depth) &&
-               "[webdav.max-recurse-depth] Must be within the range of [0-255]");
-        webdav_max_recurse_depth_ = static_cast<int8_t>(webdav_max_recurse_depth);
-    }
-
-    webdav_realm_ = reader.GetString("webdav", "realm", "WebDavRealm");
-    assert(!webdav_realm_.empty() && "[webdav.realm] Cannot be empty");
-
-    webdav_verification_ = reader.GetString("wevdav", "verification", "none");
-    assert((webdav_verification_ == "basic" || webdav_verification_ == "digest" || webdav_verification_ == "none") &&
-           "[webdav.verification] Must be one of them [basic|digest|none]");
-
-    webdav_reset_lock_ = reader.GetBoolean("webdav", "reset-lock", true);
-
-    // parse user list
-    std::string users_str = reader.GetString("webdav", "users", "");
-    std::string_view users_view = users_str;
-    for (size_t i = 0, j = 0; i < users_view.size(); ++i)
-    {
-        if (users_view[i] == ',')
-        {
-            if (j >= i)
-            {
-                continue;
-            }
-            user_parse(webdav_user_, users_view.substr(j, i));
-            ++i;
-            j = i;
-        }
-    }
-    // =======================================================================================
-
-    // === redis =============================================================================
-    redis_host_ = reader.GetString("redis", "host", "localhost");
-
-    {
-        long redis_port = reader.GetInteger("redis", "port", 6379);
-        assert(std::in_range<uint16_t>(redis_port) && "redis port number out of range");
-        redis_port_ = static_cast<uint16_t>(redis_port);
-    }
-
-    redis_username_ = reader.GetString("redis", "username", "");
-    assert(!redis_username_.empty() && "[redis.username] Cannot be empty");
-
-    redis_password_ = reader.GetString("redis", "password", "");
-    assert(!redis_password_.empty() && "[redis.password] Cannot be empty");
-    // =======================================================================================
-
-    // === engine ============================================================================
-    std::unordered_set<std::string> engine_list{"memory", "sqlite", "redis"};
-
-    etag_engine_ = reader.GetString("engine", "etag", "sqlite");
-    assert(engine_list.contains(etag_engine_) && "[engine.etag] Must be one of them [memory|sqlite|redis]");
-
-    lock_engine_ = reader.GetString("engine", "lock", "memory");
-    assert(engine_list.contains(lock_engine_) && "[engine.lock] Must be one of them [memory|sqlite|redis]");
-
-    prop_engine_ = reader.GetString("engine", "prop", "sqlite");
-    assert(engine_list.contains(prop_engine_) && "[engine.prop] Must be one of them [memory|sqlite|redis]");
-    // =======================================================================================
-
-    // === cache =-===========================================================================
-    sqlite_db_ = reader.GetString("cache", "sqlite-db", "./data.db");
-    etag_data_ = reader.GetString("cache", "etag-data", "./etag.dat");
-    lock_data_ = reader.GetString("cache", "lock-data", "./lock.dat");
-    prop_data_ = reader.GetString("cache", "prop-data", "./prop.dat");
-    // =======================================================================================
+    ParseCacheConfig(reader, sqlite_db_, etag_data_, lock_data_, prop_data_);
 }
 
 const std::filesystem::path& ConfigReader::GetCWD() const noexcept
@@ -329,9 +362,15 @@ const std::string& ConfigReader::GetWebDavVerification() const noexcept
     return webdav_verification_;
 }
 
-auto ConfigReader::GetWebDavUser() const noexcept -> const std::unordered_map<std::string, std::string>&
+std::string ConfigReader::GetWebDavUser(const std::string& user) const noexcept
 {
-    return webdav_user_;
+    const auto& it = webdav_user_.find(user);
+    if (it == webdav_user_.end())
+    {
+        return {""};
+    }
+
+    return it->second;
 }
 
 bool ConfigReader::GetWebDavResetLock() const noexcept

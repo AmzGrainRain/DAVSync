@@ -1,11 +1,9 @@
 #include "SQLiteFileETagService.h"
 
-#include <entity.hpp>
 #include <format>
-#include <spdlog/spdlog.h>
 
+#include "logger.hpp"
 #include "ConfigReader.h"
-#include "FileETagService.h"
 #include "utils.h"
 #include "utils/path.h"
 
@@ -36,7 +34,7 @@ std::string SQLiteFileETagService::Get(const std::filesystem::path& path)
     const auto query_res = dbng_.query_s<FileETagTable>(std::format("path='{}'", path_str));
     if (query_res.size() != 1)
     {
-        spdlog::error("The database may be damaged.");
+        LOG_ERROR("The database may be damaged.")
         return {""};
     }
 
@@ -53,7 +51,7 @@ bool SQLiteFileETagService::Set(const std::filesystem::path& path)
         {
             if (!dbng_.delete_records_s<FileETagTable>(where))
             {
-                spdlog::warn("Data deletion failed.");
+                LOG_ERROR("Data deletion failed.")
             }
         }
     }
@@ -69,7 +67,8 @@ bool SQLiteFileETagService::Set(const std::filesystem::path& path)
     }
     else
     {
-        throw std::runtime_error("Unexpected file type.");
+        LOG_WARN("Unexpected file type.")
+        return false;
     }
 
     return dbng_.insert<FileETagTable>({std::move(path_str), std::move(sha)}) == 1;
