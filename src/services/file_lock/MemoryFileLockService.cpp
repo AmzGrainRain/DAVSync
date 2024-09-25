@@ -11,40 +11,49 @@
 #include <vector>
 
 #include "ConfigReader.h"
-#include "FileLockService.h"
 #include "logger.hpp"
+#include "utils.h"
 #include "utils/path.h"
 #include "utils/string.h"
 
-namespace FileLockService
-{
-
-static inline FileLockType parse_file_lock(const std::string_view& vstr)
+static inline FileLockService::FileLockType ParseFileLock(const std::string_view& vstr)
 {
     std::string str{vstr};
     int number = std::stoi(str);
-    return static_cast<FileLockType>(number);
+    return static_cast<FileLockService::FileLockType>(number);
 }
 
-static inline int8_t parse_lock_depth(const std::string_view& vstr)
+static inline int8_t ParseLockDepth(const std::string_view& vstr)
 {
     std::string str{vstr};
     size_t number = std::stoi(str);
     return static_cast<int8_t>(number);
 }
 
-static inline std::chrono::seconds parse_expire_time(const std::string_view& vstr)
+static inline std::chrono::seconds ParseLockExpiresTime(const std::string_view& vstr)
 {
     std::string str{vstr};
     size_t number = std::stoull(str);
     return std::chrono::seconds{number};
 }
 
-static inline auto parse_lock_info(const std::vector<std::string>& list) -> MemoryFileLockService::FileLockMapValueT
+static inline auto ParseLockInfo(const std::vector<std::string>& list) -> FileLockService::FileLock
 {
-    return MemoryFileLockService::FileLockMapValueT{list[0], parse_file_lock(list[1]), parse_lock_depth(list[2]),
-                                                    parse_expire_time(list[3])};
+    using namespace FileLockService;
+
+    std::string token = list[0];
+    std::string path = list[1];
+    short depth = static_cast<short>(std::stoi(list[2]));
+    int scope = std::stoi(list[3]);
+    int type = std::stoi(list[4]);
+    long long expires_at = std::stoll(list[5]);
+    long long creation_date = std::stoll(list[6]);
+
+    return FileLock{std::move(token), std::move(path), depth, scope, type, expires_at, creation_date};
 }
+
+namespace FileLockService
+{
 
 MemoryFileLockService::MemoryFileLockService()
 {
@@ -73,7 +82,7 @@ MemoryFileLockService::MemoryFileLockService()
             return;
         }
 
-        // line string like this: token@path,lock_type,depth,expire_time
+        // line: token@path, depth, scope, type, expires_at, creation_date
         std::string raw_line{};
         while (std::getline(ifs, raw_line))
         {
@@ -100,7 +109,7 @@ MemoryFileLockService::MemoryFileLockService()
 
             try
             {
-                lock_map_.insert({FileLockMapKeyT{token}, parse_lock_info(info_list)});
+                lock_map_.insert({FileLockMapKeyT{token}, ParseLockInfo(info_list)});
             }
             catch (const std::exception& err)
             {
@@ -123,30 +132,43 @@ MemoryFileLockService::~MemoryFileLockService()
     if (!data_.is_open())
         return;
 
-    // line string like this: token@path,lock_type,depth,expire_time
+    // line: token@path, depth, scope, type, expires_at, creation_date
     for (const auto& [token, data] : lock_map_)
     {
-        data_ << utils::path::to_string(token) << '@';
+        data_ << data.token << '@';
         data_ << data.path << ',';
-        data_ << static_cast<int>(data.type) << ',';
         data_ << data.depth << ',';
-        data_ << data.expire.count() << std::endl;
+        data_ << data.scope << ',';
+        data_ << data.type << ',';
+        data_ << data.expires_at << ',';
+        data_ << data.creation_date << std::endl;
     }
 
     const auto& conf = ConfigReader::GetInstance();
     LOG_INFO_FMT("The file lock cache have been saved to {}", utils::path::to_string(conf.GetLockData()));
 }
 
-bool MemoryFileLockService::Lock(const std::string& token, const std::filesystem::path& path, int8_t depth,
-                                 FileLockType type, std::chrono::seconds expire_ts)
+bool MemoryFileLockService::Lock(const FileLock& lock)
 {
-    if (lock_map_.contains(token))
+    if (lock_map_.contains(lock.token))
     {
-        lock_map_.erase(token);
+        lock_map_.erase(lock.token);
     }
 
-    lock_map_.insert({FileLockMapKeyT{token}, {path, type, depth, expire_ts}});
-    token_map_.insert({path, token});
+    token_map_.insert({lock.path, lock.token});
+    lock_map_.insert({lock.token, lock});
+    return true;
+}
+
+bool MemoryFileLockService::Lock(FileLock&& lock)
+{
+    if (lock_map_.contains(lock.token))
+    {
+        lock_map_.erase(lock.token);
+    }
+
+    token_map_.insert({lock.path, lock.token});
+    lock_map_.insert({lock.token, std::forward<FileLock&&>(lock)});
     return true;
 }
 
@@ -173,10 +195,9 @@ bool MemoryFileLockService::IsLocked(const std::string& token)
         return false;
     }
 
-    const seconds expire_time = it->second.expire;
-    const auto now_tp = system_clock::now();
-    const auto now_sec = duration_cast<seconds>(now_tp.time_since_epoch());
-    return expire_time > now_sec;
+    const seconds expires_sec = it->second.ExpiresAt();
+    const seconds now_sec = utils::get_timestamp<std::chrono::seconds>();
+    return expires_sec > now_sec;
 }
 
 bool MemoryFileLockService::IsLocked(const std::filesystem::path& path)
@@ -195,10 +216,9 @@ bool MemoryFileLockService::IsLocked(const std::filesystem::path& path)
         return false;
     }
 
-    const seconds expire_time = it->second.expire;
-    const auto now_tp = system_clock::now();
-    const auto now_sec = duration_cast<seconds>(now_tp.time_since_epoch());
-    return expire_time > now_sec;
+    const seconds expires_sec = it->second.ExpiresAt();
+    const seconds now_sec = utils::get_timestamp<std::chrono::seconds>();
+    return expires_sec > now_sec;
 }
 
 } // namespace FileLockService

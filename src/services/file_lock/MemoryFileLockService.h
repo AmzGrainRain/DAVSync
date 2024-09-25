@@ -1,7 +1,5 @@
 #include "FileLockService.h"
 
-#include <chrono>
-#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
@@ -13,21 +11,15 @@ class MemoryFileLockService : public FileLockService
 {
   public:
     using FileLockMapKeyT = std::string;
-    using FileLockMapValueT = struct
-    {
-        std::filesystem::path path;
-        FileLockType type;
-        int8_t depth;
-        std::chrono::seconds expire;
-    };
-    using FileLockMapT = std::unordered_map<FileLockMapKeyT, FileLockMapValueT>;
+    using FileLockMapT = std::unordered_map<FileLockMapKeyT, FileLock>;
 
     MemoryFileLockService();
 
     ~MemoryFileLockService();
 
-    bool Lock(const std::string& token, const std::filesystem::path& path, int8_t depth, FileLockType type,
-              std::chrono::seconds expire_ts) override;
+    bool Lock(const FileLock& lock) override;
+
+    bool Lock(FileLock&& lock) override;
 
     bool Unlock(const std::string& token) override;
 

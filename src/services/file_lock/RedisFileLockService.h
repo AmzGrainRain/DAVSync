@@ -1,6 +1,5 @@
 #include "FileLockService.h"
 
-#include <chrono>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
@@ -17,8 +16,9 @@ class RedisFileLockService : public FileLockService
   public:
     RedisFileLockService();
 
-    bool Lock(const std::string& token, const std::filesystem::path& path, int8_t depth, FileLockType type,
-              std::chrono::seconds expire_ts) override;
+    bool Lock(const FileLock& lock) override;
+
+    bool Lock(FileLock&& lock) override;
 
     bool Unlock(const std::string& token) override;
 

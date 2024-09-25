@@ -8,8 +8,8 @@
 #include <hiredis/read.h>
 
 #include "ConfigReader.h"
-#include "utils/path.h"
 #include "utils/redis.h"
+
 using namespace utils::redis;
 
 namespace FileLockService
@@ -31,13 +31,13 @@ RedisFileLockService::RedisFileLockService() : redis_ctx_(nullptr, &redisFree)
     }
 }
 
-bool RedisFileLockService::Lock(const std::string& token, const std::filesystem::path& path, int8_t depth,
-                                FileLockType type, std::chrono::seconds expire_ts)
+bool RedisFileLockService::Lock(const FileLock& lock)
 {
-    // token @ path, type, depth, expire
-    const std::string path_str = utils::path::to_string(path);
-    const std::string command = std::format("HSET lock:{} path {} type {} depth {} expire {}", token,
-                                            static_cast<int>(type), path_str, depth, expire_ts.count());
+    // token @ token, path, depth, scope, type, expires_at, creation_date
+    const std::string command =
+        std::format("HSET lock:{} token {} path {} depth {} scope {} type {} expires_at {} creation_date", lock.token,
+                    lock.token, lock.path, lock.depth, static_cast<int>(lock.scope), static_cast<int>(lock.type),
+                    lock.expires_at, lock.creation_date);
 
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl || repl->integer != 1)
@@ -45,8 +45,13 @@ bool RedisFileLockService::Lock(const std::string& token, const std::filesystem:
         return false;
     }
 
-    token_map_.insert({path, token});
+    token_map_.insert({lock.path, lock.token});
     return true;
+}
+
+bool RedisFileLockService::Lock(FileLock&& lock)
+{
+    return Lock(lock);
 }
 
 bool RedisFileLockService::Unlock(const std::string& token)
@@ -65,7 +70,7 @@ bool RedisFileLockService::Unlock(const std::string& token)
 
     std::string command = std::format("DEL lock:{}", token);
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
-    if (!repl || repl->integer != 1)
+    if (!repl || repl->type != REDIS_REPLY_INTEGER || repl->integer != 1)
     {
         return false;
     }
@@ -101,7 +106,7 @@ bool RedisFileLockService::IsLocked(const std::filesystem::path& path)
         return false;
     }
 
-    const std::string command = std::format("HGET lock:{} path", token_it->second);
+    const std::string command = std::format("HGET lock:{} expires_at", token_it->second);
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl || repl->type == REDIS_REPLY_NIL)
     {

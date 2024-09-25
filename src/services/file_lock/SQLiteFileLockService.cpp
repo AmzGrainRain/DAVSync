@@ -4,10 +4,8 @@
 #include <filesystem>
 #include <format>
 
-#include <spdlog/spdlog.h>
-#include <utility>
-
 #include "ConfigReader.h"
+#include "FileLockService.h"
 #include "logger.hpp"
 #include "utils.h"
 #include "utils/path.h"
@@ -15,7 +13,7 @@
 namespace FileLockService
 {
 
-REFLECTION(FileLockTable, token, path, type, depth, expire_ts)
+REFLECTION(FileLock, token, path, depth, scope, type, expires_at, creation_date)
 
 SQLiteFileLockService::SQLiteFileLockService()
 {
@@ -27,56 +25,58 @@ SQLiteFileLockService::SQLiteFileLockService()
         throw std::runtime_error(dbng_.get_last_error());
     }
 
-    if (!dbng_.create_datatable<FileLockTable>(ormpp_key{"token"}))
+    if (!dbng_.create_datatable<FileLock>(ormpp_key{"token"}))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }
 }
 
-bool SQLiteFileLockService::Lock(const std::string& token, const std::filesystem::path& path, int8_t depth,
-                                 FileLockType type, std::chrono::seconds expire_ts)
+bool SQLiteFileLockService::Lock(const FileLock& lock)
 {
-    FileLockTable col{token, utils::path::to_string(path), static_cast<int>(type), static_cast<int>(depth),
-                      expire_ts.count()};
-    return dbng_.insert<FileLockTable>(std::move(col)) == 1;
+    return dbng_.insert<FileLock>(lock) == 1;
+}
+
+bool SQLiteFileLockService::Lock(FileLock&& lock)
+{
+    return Lock(lock);
 }
 
 bool SQLiteFileLockService::Unlock(const std::string& token)
 {
     const std::string where = std::format("token='{}'", token);
 
-    return dbng_.delete_records_s<FileLockTable>(where);
+    return dbng_.delete_records_s<FileLock>(where);
 }
 
 bool SQLiteFileLockService::IsLocked(const std::string& token)
 {
     const std::string where = std::format("token='{}'", token);
-    const auto query_res = dbng_.query_s<FileLockTable>(where);
+    const auto query_res = dbng_.query_s<FileLock>(where);
     if (query_res.size() != 1)
     {
         LOG_ERROR("The database may be damaged.");
         return false;
     }
 
-    auto now_sec = utils::get_timestamp<std::chrono::seconds>();
-    std::chrono::seconds expire_time{query_res[0].expire_ts};
-    return expire_time > now_sec;
+    const auto expires_sec = query_res[0].ExpiresAt();
+    const auto now_sec = utils::get_timestamp<std::chrono::seconds>();
+    return expires_sec > now_sec;
 }
 
 bool SQLiteFileLockService::IsLocked(const std::filesystem::path& path)
 {
     const std::string path_str = utils::path::to_string(path);
     const std::string where = std::format("path='{}'", path_str);
-    const auto query_res = dbng_.query_s<FileLockTable>(where);
+    const auto query_res = dbng_.query_s<FileLock>(where);
     if (query_res.size() != 1)
     {
         LOG_ERROR("The database may be damaged.");
         return false;
     }
 
-    auto now_sec = utils::get_timestamp<std::chrono::seconds>();
-    std::chrono::seconds expire_time{query_res[0].expire_ts};
-    return expire_time > now_sec;
+    const auto expires_sec = query_res[0].ExpiresAt();
+    const auto now_sec = utils::get_timestamp<std::chrono::seconds>();
+    return expires_sec > now_sec;
 }
 
 } // namespace FileLockService
