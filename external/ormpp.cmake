@@ -14,7 +14,6 @@ target_include_directories(ormpp-headers SYSTEM INTERFACE
 )
 
 add_library(sqlite3-static STATIC
-    ormpp/thirdparty/sqlite3/shell.c
     ormpp/thirdparty/sqlite3/sqlite3.c
     ormpp/thirdparty/sqlite3/sqlite3.h
     ormpp/thirdparty/sqlite3/sqlite3ext.h
