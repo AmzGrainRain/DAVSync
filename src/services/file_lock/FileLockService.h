@@ -44,6 +44,14 @@ struct FileLock
     std::chrono::seconds ExpiresAt() const;
 
     std::chrono::seconds CreationDate() const;
+
+    bool IsShared() const;
+
+    bool IsExclusive() const;
+
+    bool IsWriteLock() const;
+
+    bool IsReadLock() const;
 };
 
 class FileLockService

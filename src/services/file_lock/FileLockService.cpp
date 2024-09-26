@@ -28,4 +28,24 @@ std::chrono::seconds FileLock::CreationDate() const
     return std::chrono::seconds{creation_date};
 }
 
+bool FileLock::IsShared() const
+{
+    return static_cast<FileLockScope>(scope) == FileLockScope::SHARED;
+}
+
+bool FileLock::IsExclusive() const
+{
+    return static_cast<FileLockScope>(scope) == FileLockScope::EXCLUSIVE;
+}
+
+bool FileLock::IsWriteLock() const
+{
+    return static_cast<FileLockType>(type) == FileLockType::WRITE;
+}
+
+bool FileLock::IsReadLock() const
+{
+    return static_cast<FileLockType>(type) == FileLockType::READ;
+}
+
 } // namespace FileLockService
