@@ -17,8 +17,7 @@
 #include "utils/path.h"
 #include "utils/string.h"
 
-static inline void ParseHttpConfig(INIReader& ini, std::string& host, std::string& address, uint16_t& port,
-                                   size_t& buffer_size, uint16_t& max_thread)
+static inline void ParseHttpConfig(INIReader& ini, std::string& host, std::string& address, uint16_t& port, size_t& buffer_size, uint16_t& max_thread)
 {
     // host
     host = ini.GetString("http", "host", "127.0.0.1");
@@ -47,8 +46,7 @@ static inline void ParseHttpConfig(INIReader& ini, std::string& host, std::strin
     }
 }
 
-static inline void ParseHttpsConfig(INIReader& ini, bool& enable, uint16_t& port, bool& only,
-                                    std::filesystem::path& cert, std::filesystem::path& key)
+static inline void ParseHttpsConfig(INIReader& ini, bool& enable, uint16_t& port, bool& only, std::filesystem::path& cert, std::filesystem::path& key)
 {
     // https enable
     enable = ini.GetBoolean("https", "enable", "false");
@@ -74,14 +72,12 @@ static inline void ParseHttpsConfig(INIReader& ini, bool& enable, uint16_t& port
     }
 }
 
-static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::string& route_prefix,
-                                     std::filesystem::path& absolute_data_path,
-                                     std::filesystem::path& relative_data_path, int8_t& max_recurse_depth,
-                                     std::string& realm, std::string& verification,
-                                     std::unordered_map<std::string, std::string>& users, bool& reset_lock)
+static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::string& route_prefix, std::filesystem::path& absolute_data_path,
+                                     std::filesystem::path& relative_data_path, int8_t& max_recurse_depth, std::string& realm,
+                                     std::string& verification, std::unordered_map<std::string, std::string>& users, bool& reset_lock)
 {
     // webdav prefix
-    prefix = ini.GetString("webdav", "prefix", "./webdav");
+    prefix = ini.GetString("webdav", "prefix", "/webdav");
     assert(!prefix.empty() && "[webdav.prefix] Cannot be empty");
     {
         char c = prefix.back();
@@ -109,8 +105,7 @@ static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::s
 
     // webdav propfind max recurse depth
     long _max_recurse_depth = ini.GetInteger("webdav", "max-recurse-depth", 4);
-    assert(std::in_range<int8_t>(_max_recurse_depth) &&
-           "[webdav.max-recurse-depth] Must be within the range of [0-255]");
+    assert(std::in_range<int8_t>(_max_recurse_depth) && "[webdav.max-recurse-depth] Must be within the range of [0-255]");
     max_recurse_depth = static_cast<int8_t>(_max_recurse_depth);
 
     // webdav auth realm
@@ -133,8 +128,7 @@ static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::s
     reset_lock = ini.GetBoolean("webdav", "reset-lock", true);
 }
 
-static inline void ParseRedisConfig(INIReader& ini, std::string& host, uint16_t& port, std::string& user,
-                                    std::string& passwd)
+static inline void ParseRedisConfig(INIReader& ini, std::string& host, uint16_t& port, std::string& user, std::string& passwd)
 {
     // redis address
     host = ini.GetString("redis", "host", "localhost");
@@ -153,8 +147,7 @@ static inline void ParseRedisConfig(INIReader& ini, std::string& host, uint16_t&
     assert(!passwd.empty() && "[redis.password] Cannot be empty");
 }
 
-static inline void ParseEngineConfig(INIReader& ini, std::string& etag_engine, std::string& lock_engine,
-                                     std::string& prop_engine)
+static inline void ParseEngineConfig(INIReader& ini, std::string& etag_engine, std::string& lock_engine, std::string& prop_engine)
 {
     std::unordered_set<std::string> engine_list{"memory", "sqlite", "redis"};
 
@@ -261,9 +254,8 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
 
     ParseHttpsConfig(reader, https_enable_, https_port_, https_only_, ssl_cert_, ssl_key_);
 
-    ParseWebDAVConfig(reader, webdav_prefix_, webdav_route_prefix_, webdav_absolute_data_path_,
-                      webdav_relative_data_path_, webdav_max_recurse_depth_, webdav_realm_, webdav_verification_,
-                      webdav_user_, webdav_reset_lock_);
+    ParseWebDAVConfig(reader, webdav_prefix_, webdav_route_prefix_, webdav_absolute_data_path_, webdav_relative_data_path_, webdav_max_recurse_depth_,
+                      webdav_realm_, webdav_verification_, webdav_user_, webdav_reset_lock_);
 
     ParseRedisConfig(reader, redis_host_, redis_port_, redis_username_, redis_password_);
 
@@ -342,9 +334,44 @@ const std::filesystem::path& ConfigReader::GetWebDavRelativeDataPath() const noe
     return webdav_relative_data_path_;
 }
 
+std::filesystem::path ConfigReader::GetWebDavRelativeDataPath(std::string_view url) const noexcept
+{
+    return std::filesystem::relative(GetWebDavAbsoluteDataPath(url), cwd_);
+}
+
 const std::filesystem::path& ConfigReader::GetWebDavAbsoluteDataPath() const noexcept
 {
     return webdav_absolute_data_path_;
+}
+
+std::filesystem::path ConfigReader::GetWebDavAbsoluteDataPath(std::string_view url) const noexcept
+{
+    namespace fs = std::filesystem;
+
+    if (url == webdav_prefix_)
+    {
+        return webdav_absolute_data_path_;
+    }
+
+    if (url.starts_with(webdav_prefix_))
+    {
+        url = url.substr(webdav_prefix_.size());
+    }
+
+    fs::path res = webdav_absolute_data_path_ / url;
+    res = res.lexically_normal();
+    // Escape from resource directory?
+    {
+        auto path = fs::relative(res, webdav_absolute_data_path_);
+        auto path_str = utils::path::to_string(path);
+        if (path_str.starts_with(".."))
+        {
+            LOG_WARN_FMT("Discovery of escape behavior from resource directory!\nTo: {}", path_str);
+            return {""};
+        }
+    }
+
+    return res;
 }
 
 int8_t ConfigReader::GetWebDavMaxRecurseDepth() const noexcept

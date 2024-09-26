@@ -32,7 +32,9 @@ class ConfigReader
     const std::string& GetWebDavPrefix() const noexcept;
     const std::string& GetWebDavRoutePrefix() const noexcept;
     const std::filesystem::path& GetWebDavRelativeDataPath() const noexcept;
+    std::filesystem::path GetWebDavRelativeDataPath(std::string_view url) const noexcept;
     const std::filesystem::path& GetWebDavAbsoluteDataPath() const noexcept;
+    std::filesystem::path GetWebDavAbsoluteDataPath(std::string_view url) const noexcept;
     int8_t GetWebDavMaxRecurseDepth() const noexcept;
     const std::string& GetWebDavRealm() const noexcept;
     const std::string& GetWebDavVerification() const noexcept;

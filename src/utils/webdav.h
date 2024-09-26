@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <stack>
-#include <string_view>
 
 #include <pugixml.hpp>
 
@@ -17,8 +16,5 @@ void generate_response_list(pugi::xml_node& multistatus, const std::filesystem::
 void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std::filesystem::path> dirs, int8_t depth);
 
 void generate_response_list_recurse(pugi::xml_node& multistatus, const std::filesystem::path& path, int8_t depth);
-
-auto uri_to_absolute(const std::filesystem::path& webdav_abslute_data_path, const std::string& webdav_prefix,
-                     const std::string_view& uri) -> std::filesystem::path;
 
 } // namespace utils::webdav

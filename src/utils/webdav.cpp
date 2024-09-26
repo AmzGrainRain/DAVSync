@@ -123,14 +123,4 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, const std::file
     generate_response_list_recurse(multistatus, std::move(stack), depth);
 }
 
-auto uri_to_absolute(const std::filesystem::path& webdav_abslute_data_path, const std::string& webdav_prefix,
-                     const std::string_view& uri) -> std::filesystem::path
-{
-    std::string uri_str{uri.substr(webdav_prefix.size())};
-    uri_str.insert(uri_str.begin(), '/');
-    uri_str.insert(uri_str.begin(), '.');
-
-    return (webdav_abslute_data_path / uri_str).lexically_normal();
-}
-
 } // namespace utils::webdav
