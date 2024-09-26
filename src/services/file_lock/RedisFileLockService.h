@@ -26,6 +26,10 @@ class RedisFileLockService : public FileLockService
 
     bool IsLocked(const std::filesystem::path& path) override;
 
+    FileLock GetLock(const std::string& token) override;
+
+    FileLock GetLock(const std::filesystem::path& path) override;
+
   private:
     std::string auth_str_;
     utils::redis::RedisContextT redis_ctx_;

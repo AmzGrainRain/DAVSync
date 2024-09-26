@@ -19,6 +19,10 @@ class SQLiteFileLockService : public FileLockService
 
     bool IsLocked(const std::filesystem::path& path) override;
 
+    FileLock GetLock(const std::string& token) override;
+
+    FileLock GetLock(const std::filesystem::path& path) override;
+
   private:
     ormpp::dbng<ormpp::sqlite> dbng_;
 };

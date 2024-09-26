@@ -56,8 +56,10 @@ class FileLockService
     virtual bool Unlock(const std::string& token) = 0;
 
     virtual bool IsLocked(const std::string& token) = 0;
-
     virtual bool IsLocked(const std::filesystem::path& path) = 0;
+
+    virtual FileLock GetLock(const std::string& token) = 0;
+    virtual FileLock GetLock(const std::filesystem::path& path) = 0;
 };
 
 } // namespace FileLockService

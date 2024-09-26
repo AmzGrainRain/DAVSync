@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -219,6 +220,22 @@ bool MemoryFileLockService::IsLocked(const std::filesystem::path& path)
     const seconds expires_sec = it->second.ExpiresAt();
     const seconds now_sec = utils::get_timestamp<std::chrono::seconds>();
     return expires_sec > now_sec;
+}
+
+FileLock MemoryFileLockService::GetLock(const std::string& token)
+{
+    const auto& it = lock_map_.find(token);
+    if (it == lock_map_.end())
+    {
+        throw std::runtime_error("lock not exists.");
+    }
+
+    return it->second;
+}
+
+FileLock MemoryFileLockService::GetLock(const std::filesystem::path& path)
+{
+    return GetLock(utils::path::to_string(path));
 }
 
 } // namespace FileLockService

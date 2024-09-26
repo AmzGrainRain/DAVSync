@@ -27,6 +27,10 @@ class MemoryFileLockService : public FileLockService
 
     bool IsLocked(const std::filesystem::path& path) override;
 
+    FileLock GetLock(const std::string& token) override;
+
+    FileLock GetLock(const std::filesystem::path& path) override;
+
   private:
     FileLockMapT lock_map_;
     std::unordered_map<std::filesystem::path, std::string> token_map_;

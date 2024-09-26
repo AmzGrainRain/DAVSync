@@ -1,16 +1,66 @@
 #include "RedisFileLockService.h"
 
 #include <chrono>
+#include <cstddef>
+#include <cstring>
 #include <filesystem>
 #include <format>
 
 #include <hiredis/hiredis.h>
 #include <hiredis/read.h>
+#include <stdexcept>
+#include <string>
 
 #include "ConfigReader.h"
+#include "logger.hpp"
+#include "services/file_lock/FileLockService.h"
+#include "utils/path.h"
 #include "utils/redis.h"
 
 using namespace utils::redis;
+
+static FileLockService::FileLock ParseLock(const redisReply* const repl)
+{
+    FileLockService::FileLock lock{};
+    for (size_t i = 0; i < repl->elements; i += 2)
+    {
+        if (repl->element[i]->type != REDIS_REPLY_STRING)
+        {
+            continue;
+        }
+
+        if (std::strcmp(repl->element[i]->str, "token") == 0)
+        {
+            lock.token = repl->element[i + 1]->str;
+        }
+        else if (std::strcmp(repl->element[i]->str, "path") == 0)
+        {
+            lock.path = repl->element[i + 1]->str;
+        }
+        else if (std::strcmp(repl->element[i]->str, "depth") == 0)
+        {
+            lock.depth = std::stoi(repl->element[i + 1]->str);
+        }
+        else if (std::strcmp(repl->element[i]->str, "scope") == 0)
+        {
+            lock.scope = std::stoi(repl->element[i + 1]->str);
+        }
+        else if (std::strcmp(repl->element[i]->str, "type") == 0)
+        {
+            lock.type = std::stoi(repl->element[i + 1]->str);
+        }
+        else if (std::strcmp(repl->element[i]->str, "expires_at") == 0)
+        {
+            lock.expires_at = std::stoll(repl->element[i + 1]->str);
+        }
+        else if (std::strcmp(repl->element[i]->str, "creation_date") == 0)
+        {
+            lock.creation_date = std::stoll(repl->element[i + 1]->str);
+        }
+    }
+
+    return lock;
+}
 
 namespace FileLockService
 {
@@ -42,6 +92,8 @@ bool RedisFileLockService::Lock(const FileLock& lock)
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl || repl->integer != 1)
     {
+        if (redis_ctx_->err)
+            LOG_WARN(redis_ctx_->errstr)
         return false;
     }
 
@@ -62,6 +114,8 @@ bool RedisFileLockService::Unlock(const std::string& token)
         auto repl = RedisExecute(redis_ctx_.get(), command);
         if (!repl || repl->type == REDIS_REPLY_NIL)
         {
+            if (redis_ctx_->err)
+                LOG_WARN(redis_ctx_->errstr)
             return false;
         }
 
@@ -72,6 +126,8 @@ bool RedisFileLockService::Unlock(const std::string& token)
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl || repl->type != REDIS_REPLY_INTEGER || repl->integer != 1)
     {
+        if (redis_ctx_->err)
+            LOG_WARN(redis_ctx_->errstr)
         return false;
     }
 
@@ -87,6 +143,8 @@ bool RedisFileLockService::IsLocked(const std::string& token)
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl || repl->type == REDIS_REPLY_NIL)
     {
+        if (redis_ctx_->err)
+            LOG_WARN(redis_ctx_->errstr)
         return false;
     }
 
@@ -110,6 +168,8 @@ bool RedisFileLockService::IsLocked(const std::filesystem::path& path)
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl || repl->type == REDIS_REPLY_NIL)
     {
+        if (redis_ctx_->err)
+            LOG_WARN(redis_ctx_->errstr)
         return false;
     }
 
@@ -117,6 +177,23 @@ bool RedisFileLockService::IsLocked(const std::filesystem::path& path)
     auto now = system_clock::now().time_since_epoch();
     auto now_sec = duration_cast<seconds>(now);
     return expire_sec > now_sec;
+}
+
+FileLock RedisFileLockService::GetLock(const std::string& token)
+{
+    const std::string command = std::format("HGETALL lock:{}", token);
+    RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
+    if (!repl || redis_ctx_->err || repl->type != REDIS_REPLY_ARRAY || repl->elements % 2)
+    {
+        throw std::runtime_error(redis_ctx_->errstr);
+    }
+
+    return ParseLock(repl.get());
+}
+
+FileLock RedisFileLockService::GetLock(const std::filesystem::path& path)
+{
+    return GetLock(utils::path::to_string(path));
 }
 
 } // namespace FileLockService
