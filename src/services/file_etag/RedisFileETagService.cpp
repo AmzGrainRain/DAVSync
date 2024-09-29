@@ -33,7 +33,7 @@ RedisFileETagService::RedisFileETagService() : redis_ctx_(nullptr, &redisFree)
     }
 }
 
-std::string RedisFileETagService::Get(const std::filesystem::path& path)
+std::string RedisFileETagService::Get(const std::filesystem::path& path) noexcept
 {
     const std::string key = utils::path::to_string(path);
     const std::string command = std::format("GET etag:{}", key);
@@ -47,7 +47,7 @@ std::string RedisFileETagService::Get(const std::filesystem::path& path)
     return {repl->str};
 }
 
-std::string RedisFileETagService::Set(const std::filesystem::path& path)
+std::string RedisFileETagService::Set(const std::filesystem::path& path) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     std::string sha{};

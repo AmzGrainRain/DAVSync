@@ -21,9 +21,9 @@ class MemoryFileETagService : public FileETagService
 
     ~MemoryFileETagService();
 
-    std::string Get(const std::filesystem::path& path) override;
+    std::string Get(const std::filesystem::path& path) noexcept override;
 
-    std::string Set(const std::filesystem::path& path) override;
+    std::string Set(const std::filesystem::path& path) noexcept override;
 
   private:
     ETagMapT etag_map_;

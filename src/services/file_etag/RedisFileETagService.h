@@ -16,9 +16,9 @@ class RedisFileETagService : public FileETagService
   public:
     RedisFileETagService();
 
-    std::string Get(const std::filesystem::path& path) override;
+    std::string Get(const std::filesystem::path& path) noexcept override;
 
-    std::string Set(const std::filesystem::path& path) override;
+    std::string Set(const std::filesystem::path& path) noexcept override;
 
   private:
     std::string auth_str_;

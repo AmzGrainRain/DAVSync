@@ -29,7 +29,7 @@ SQLiteFileETagService::SQLiteFileETagService()
     }
 }
 
-std::string SQLiteFileETagService::Get(const std::filesystem::path& path)
+std::string SQLiteFileETagService::Get(const std::filesystem::path& path) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     const auto query_res = dbng_.query_s<FileETagTable>(std::format("path='{}'", path_str));
@@ -42,7 +42,7 @@ std::string SQLiteFileETagService::Get(const std::filesystem::path& path)
     return query_res[0].sha;
 }
 
-std::string SQLiteFileETagService::Set(const std::filesystem::path& path)
+std::string SQLiteFileETagService::Set(const std::filesystem::path& path) noexcept
 {
     std::string path_str = utils::path::to_string(path);
     {

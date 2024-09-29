@@ -17,8 +17,8 @@ struct FileETagTable
 class FileETagService
 {
   public:
-    virtual std::string Get(const std::filesystem::path& path) = 0;
-    virtual std::string Set(const std::filesystem::path& path) = 0;
+    virtual std::string Get(const std::filesystem::path& path) noexcept = 0;
+    virtual std::string Set(const std::filesystem::path& path) noexcept = 0;
 };
 
 } // namespace FileETagService

@@ -75,7 +75,7 @@ MemoryFileETagService::~MemoryFileETagService()
     LOG_INFO_FMT("The file etag have been saved to {}", utils::path::to_string(conf.GetETagData()))
 }
 
-std::string MemoryFileETagService::Get(const std::filesystem::path& path)
+std::string MemoryFileETagService::Get(const std::filesystem::path& path) noexcept
 {
     const auto& it = etag_map_.find(path);
     if (it == etag_map_.end())
@@ -86,7 +86,7 @@ std::string MemoryFileETagService::Get(const std::filesystem::path& path)
     return {it->second};
 }
 
-std::string MemoryFileETagService::Set(const std::filesystem::path& path)
+std::string MemoryFileETagService::Set(const std::filesystem::path& path) noexcept
 {
     try
     {
