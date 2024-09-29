@@ -1,12 +1,11 @@
-#include <async_simple/Future.h>
 #include <exception>
+#include <locale>
 
 #include <cinatra/coro_http_request.hpp>
 #include <cinatra/coro_http_response.hpp>
 #include <cinatra/coro_http_server.hpp>
 #include <pugixml.hpp>
 
-#include "logger.hpp"
 #include "section/BasicAuth.h"
 #include "section/DigestAuth.h"
 
@@ -24,12 +23,16 @@
 #include "routes/webdav/put.h"
 #include "routes/webdav/unlock.h"
 
+#include "logger.hpp"
 #include "ConfigReader.h"
 
 int main()
 {
     namespace R = Routes::WebDAV;
     using namespace cinatra;
+
+    std::locale::global(std::locale("en_US.UTF-8"));
+    std::cout.imbue(std::locale());
 
     try
     {
@@ -95,7 +98,7 @@ int main()
         });
 
         LOG_INFO_FMT("Server running at {}://{}:{}", conf.GetHttpsEnabled() ? "https" : "http", conf.GetHttpHost(),
-                 conf.GetHttpsEnabled() ? conf.GetHttpsPort() : conf.GetHttpPort());
+                     conf.GetHttpsEnabled() ? conf.GetHttpsPort() : conf.GetHttpPort());
 
         return app.sync_start().value();
     }
