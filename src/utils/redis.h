@@ -11,10 +11,12 @@ namespace utils::redis
 using RedisContextT = std::unique_ptr<redisContext, decltype(&redisFree)>;
 using RedisReplyT = std::unique_ptr<redisReply, decltype(&freeReplyObject)>;
 
-RedisContextT GetRedisContext(const std::string& host, int port);
+[[nodiscard]]
+RedisContextT GetRedisContext(const std::string& host, int port) noexcept(false);
 
-RedisReplyT RedisExecute(redisContext* ctx, const std::string& command);
+[[nodiscard]]
+RedisReplyT RedisExecute(redisContext* ctx, const std::string& command) noexcept;
 
-bool RedisAuth(redisContext* ctx, const std::string& user, const std::string& password);
+bool RedisAuth(redisContext* ctx, const std::string& user, const std::string& password) noexcept;
 
 } // namespace utils::redis

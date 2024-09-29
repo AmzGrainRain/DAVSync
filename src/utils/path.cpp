@@ -6,14 +6,15 @@
 namespace utils::path
 {
 
-std::string to_string(const std::filesystem::path& path)
+std::string to_string(const std::filesystem::path& path) noexcept
 {
     auto u8str = path.u8string();
     return std::string{u8str.begin(), u8str.end()};
 }
 
-std::string with_separator(const std::filesystem::path& path, uint16_t skip, bool is_dir, char separator)
+std::string with_separator(const std::filesystem::path& path, bool is_dir, char separator, uint16_t skip) noexcept
 {
+
     auto it = path.begin();
 
     // skip

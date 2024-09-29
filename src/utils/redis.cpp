@@ -2,28 +2,33 @@
 
 #include <hiredis/hiredis.h>
 
-#include <stdexcept>
 #include <format>
+#include <stdexcept>
 
 namespace utils::redis
 {
 
-RedisContextT GetRedisContext(const std::string& host, int port)
+RedisContextT GetRedisContext(const std::string& host, int port) noexcept(false)
 {
-    return {redisConnect(host.data(), port), &redisFree};
-}
-
-auto RedisExecute(redisContext* ctx, const std::string& command) -> RedisReplyT
-{
-    RedisReplyT repl{static_cast<redisReply*>(redisCommand(ctx, command.data())), &freeReplyObject};
-    if (!repl)
+    redisContext* ptr = redisConnect(host.data(), port);
+    if (!ptr || ptr->err)
     {
-        throw std::runtime_error("Memory allocation error occurred.");
+        throw std::runtime_error("Redis connection error.");
     }
 
+    return {ptr, &redisFree};
+}
+
+auto RedisExecute(redisContext* ctx, const std::string& command) noexcept -> RedisReplyT
+{
+    RedisReplyT repl{static_cast<redisReply*>(redisCommand(ctx, command.data())), &freeReplyObject};
     if (ctx->err)
     {
-        throw std::runtime_error(ctx->errstr);
+        repl.reset();
+    }
+
+    if (!repl)
+    {
         repl.reset();
     }
 
@@ -35,7 +40,7 @@ auto RedisExecute(redisContext* ctx, const std::string& command) -> RedisReplyT
     return std::move(repl);
 }
 
-bool RedisAuth(redisContext* ctx, const std::string& user, const std::string& password)
+bool RedisAuth(redisContext* ctx, const std::string& user, const std::string& password) noexcept
 {
     const std::string auth_str = std::format("AUTH {} {}", user, password);
     RedisReplyT repl = RedisExecute(ctx, auth_str.data());
