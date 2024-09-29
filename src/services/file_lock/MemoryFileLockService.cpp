@@ -123,8 +123,7 @@ MemoryFileLockService::MemoryFileLockService()
     data_.open(data_path, std::ios::out);
     if (!data_.is_open())
     {
-        LOG_ERROR_FMT("Unable to save file lock cache to '{}', file lock cache are lost when the server stops.",
-                      data_path_str);
+        LOG_ERROR_FMT("Unable to save file lock cache to '{}', file lock cache are lost when the server stops.", data_path_str);
     }
 }
 
@@ -149,7 +148,7 @@ MemoryFileLockService::~MemoryFileLockService()
     LOG_INFO_FMT("The file lock cache have been saved to {}", utils::path::to_string(conf.GetLockData()));
 }
 
-bool MemoryFileLockService::Lock(const FileLock& lock)
+bool MemoryFileLockService::Lock(const FileLock& lock) noexcept
 {
     if (lock_map_.contains(lock.token))
     {
@@ -161,7 +160,7 @@ bool MemoryFileLockService::Lock(const FileLock& lock)
     return true;
 }
 
-bool MemoryFileLockService::Lock(FileLock&& lock)
+bool MemoryFileLockService::Lock(FileLock&& lock) noexcept
 {
     if (lock_map_.contains(lock.token))
     {
@@ -173,7 +172,7 @@ bool MemoryFileLockService::Lock(FileLock&& lock)
     return true;
 }
 
-bool MemoryFileLockService::Unlock(const std::string& token)
+bool MemoryFileLockService::Unlock(const std::string& token) noexcept
 {
     const auto& it = lock_map_.find(token);
     if (it == lock_map_.end())
@@ -186,7 +185,7 @@ bool MemoryFileLockService::Unlock(const std::string& token)
     return true;
 }
 
-bool MemoryFileLockService::IsLocked(const std::string& token)
+bool MemoryFileLockService::IsLocked(const std::string& token) noexcept
 {
     using namespace std::chrono;
 
@@ -201,7 +200,7 @@ bool MemoryFileLockService::IsLocked(const std::string& token)
     return expires_sec > now_sec;
 }
 
-bool MemoryFileLockService::IsLocked(const std::filesystem::path& path)
+bool MemoryFileLockService::IsLocked(const std::filesystem::path& path) noexcept
 {
     using namespace std::chrono;
 
@@ -222,7 +221,7 @@ bool MemoryFileLockService::IsLocked(const std::filesystem::path& path)
     return expires_sec > now_sec;
 }
 
-FileLock MemoryFileLockService::GetLock(const std::string& token)
+FileLock MemoryFileLockService::GetLock(const std::string& token) noexcept(false)
 {
     const auto& it = lock_map_.find(token);
     if (it == lock_map_.end())
@@ -233,7 +232,7 @@ FileLock MemoryFileLockService::GetLock(const std::string& token)
     return it->second;
 }
 
-FileLock MemoryFileLockService::GetLock(const std::filesystem::path& path)
+FileLock MemoryFileLockService::GetLock(const std::filesystem::path& path) noexcept(false)
 {
     return GetLock(utils::path::to_string(path));
 }

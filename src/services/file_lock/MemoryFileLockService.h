@@ -17,19 +17,19 @@ class MemoryFileLockService : public FileLockService
 
     ~MemoryFileLockService();
 
-    bool Lock(const FileLock& lock) override;
+    bool Lock(const FileLock& lock) noexcept override;
 
-    bool Lock(FileLock&& lock) override;
+    bool Lock(FileLock&& lock) noexcept override;
 
-    bool Unlock(const std::string& token) override;
+    bool Unlock(const std::string& token) noexcept override;
 
-    bool IsLocked(const std::string& token) override;
+    bool IsLocked(const std::string& token) noexcept override;
 
-    bool IsLocked(const std::filesystem::path& path) override;
+    bool IsLocked(const std::filesystem::path& path) noexcept override;
 
-    FileLock GetLock(const std::string& token) override;
+    FileLock GetLock(const std::string& token) noexcept(false) override;
 
-    FileLock GetLock(const std::filesystem::path& path) override;
+    FileLock GetLock(const std::filesystem::path& path) noexcept(false) override;
 
   private:
     FileLockMapT lock_map_;

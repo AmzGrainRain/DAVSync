@@ -81,13 +81,12 @@ RedisFileLockService::RedisFileLockService() : redis_ctx_(nullptr, &redisFree)
     }
 }
 
-bool RedisFileLockService::Lock(const FileLock& lock)
+bool RedisFileLockService::Lock(const FileLock& lock) noexcept
 {
     // token @ token, path, depth, scope, type, expires_at, creation_date
     const std::string command =
-        std::format("HSET lock:{} token {} path {} depth {} scope {} type {} expires_at {} creation_date", lock.token,
-                    lock.token, lock.path, lock.depth, static_cast<int>(lock.scope), static_cast<int>(lock.type),
-                    lock.expires_at, lock.creation_date);
+        std::format("HSET lock:{} token {} path {} depth {} scope {} type {} expires_at {} creation_date", lock.token, lock.token, lock.path,
+                    lock.depth, static_cast<int>(lock.scope), static_cast<int>(lock.type), lock.expires_at, lock.creation_date);
 
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
     if (!repl || repl->integer != 1)
@@ -101,12 +100,12 @@ bool RedisFileLockService::Lock(const FileLock& lock)
     return true;
 }
 
-bool RedisFileLockService::Lock(FileLock&& lock)
+bool RedisFileLockService::Lock(FileLock&& lock) noexcept
 {
     return Lock(lock);
 }
 
-bool RedisFileLockService::Unlock(const std::string& token)
+bool RedisFileLockService::Unlock(const std::string& token) noexcept
 {
     std::filesystem::path path{};
     {
@@ -135,7 +134,7 @@ bool RedisFileLockService::Unlock(const std::string& token)
     return true;
 }
 
-bool RedisFileLockService::IsLocked(const std::string& token)
+bool RedisFileLockService::IsLocked(const std::string& token) noexcept
 {
     using namespace std::chrono;
 
@@ -154,7 +153,7 @@ bool RedisFileLockService::IsLocked(const std::string& token)
     return expire_sec > now_sec;
 }
 
-bool RedisFileLockService::IsLocked(const std::filesystem::path& path)
+bool RedisFileLockService::IsLocked(const std::filesystem::path& path) noexcept
 {
     using namespace std::chrono;
 
@@ -179,7 +178,7 @@ bool RedisFileLockService::IsLocked(const std::filesystem::path& path)
     return expire_sec > now_sec;
 }
 
-FileLock RedisFileLockService::GetLock(const std::string& token)
+FileLock RedisFileLockService::GetLock(const std::string& token) noexcept(false)
 {
     const std::string command = std::format("HGETALL lock:{}", token);
     RedisReplyT repl = RedisExecute(redis_ctx_.get(), command);
@@ -191,7 +190,7 @@ FileLock RedisFileLockService::GetLock(const std::string& token)
     return ParseLock(repl.get());
 }
 
-FileLock RedisFileLockService::GetLock(const std::filesystem::path& path)
+FileLock RedisFileLockService::GetLock(const std::filesystem::path& path) noexcept(false)
 {
     return GetLock(utils::path::to_string(path));
 }

@@ -57,17 +57,17 @@ struct FileLock
 class FileLockService
 {
   public:
-    virtual bool Lock(const FileLock& lock) = 0;
+    virtual bool Lock(const FileLock& lock) noexcept = 0;
 
-    virtual bool Lock(FileLock&& lock) = 0;
+    virtual bool Lock(FileLock&& lock) noexcept = 0;
 
-    virtual bool Unlock(const std::string& token) = 0;
+    virtual bool Unlock(const std::string& token) noexcept = 0;
 
-    virtual bool IsLocked(const std::string& token) = 0;
-    virtual bool IsLocked(const std::filesystem::path& path) = 0;
+    virtual bool IsLocked(const std::string& token) noexcept = 0;
+    virtual bool IsLocked(const std::filesystem::path& path) noexcept = 0;
 
-    virtual FileLock GetLock(const std::string& token) = 0;
-    virtual FileLock GetLock(const std::filesystem::path& path) = 0;
+    virtual FileLock GetLock(const std::string& token) noexcept(false) = 0;
+    virtual FileLock GetLock(const std::filesystem::path& path) noexcept(false) = 0;
 };
 
 } // namespace FileLockService

@@ -32,24 +32,24 @@ SQLiteFileLockService::SQLiteFileLockService()
     }
 }
 
-bool SQLiteFileLockService::Lock(const FileLock& lock)
+bool SQLiteFileLockService::Lock(const FileLock& lock) noexcept
 {
     return dbng_.insert<FileLock>(lock) == 1;
 }
 
-bool SQLiteFileLockService::Lock(FileLock&& lock)
+bool SQLiteFileLockService::Lock(FileLock&& lock) noexcept
 {
     return Lock(lock);
 }
 
-bool SQLiteFileLockService::Unlock(const std::string& token)
+bool SQLiteFileLockService::Unlock(const std::string& token) noexcept
 {
     const std::string where = std::format("token='{}'", token);
 
     return dbng_.delete_records_s<FileLock>(where);
 }
 
-bool SQLiteFileLockService::IsLocked(const std::string& token)
+bool SQLiteFileLockService::IsLocked(const std::string& token) noexcept
 {
     const std::string where = std::format("token='{}'", token);
     const auto query_res = dbng_.query_s<FileLock>(where);
@@ -64,7 +64,7 @@ bool SQLiteFileLockService::IsLocked(const std::string& token)
     return expires_sec > now_sec;
 }
 
-bool SQLiteFileLockService::IsLocked(const std::filesystem::path& path)
+bool SQLiteFileLockService::IsLocked(const std::filesystem::path& path) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     const std::string where = std::format("path='{}'", path_str);
@@ -80,7 +80,7 @@ bool SQLiteFileLockService::IsLocked(const std::filesystem::path& path)
     return expires_sec > now_sec;
 }
 
-FileLock SQLiteFileLockService::GetLock(const std::string& token)
+FileLock SQLiteFileLockService::GetLock(const std::string& token) noexcept(false)
 {
     const std::string where = std::format("token='{}'", token);
     const auto query_res = dbng_.query_s<FileLock>(where);
@@ -92,7 +92,7 @@ FileLock SQLiteFileLockService::GetLock(const std::string& token)
     return query_res[0];
 }
 
-FileLock SQLiteFileLockService::GetLock(const std::filesystem::path& path)
+FileLock SQLiteFileLockService::GetLock(const std::filesystem::path& path) noexcept(false)
 {
     const std::string path_str = utils::path::to_string(path);
     const std::string where = std::format("path='{}'", path_str);
