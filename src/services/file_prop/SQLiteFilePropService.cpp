@@ -6,10 +6,11 @@
 
 #include <vector>
 
-#include "logger.hpp"
 #include "ConfigReader.h"
 #include "FilePropService.h"
+#include "logger.hpp"
 #include "utils/path.h"
+
 
 namespace FilePropService
 {
@@ -17,7 +18,7 @@ namespace FilePropService
 REGISTER_AUTO_KEY(FilePropTable, id)
 REFLECTION(FilePropTable, path, key, value, id)
 
-SQLiteFilePropService::SQLiteFilePropService()
+SQLiteFilePropService::SQLiteFilePropService() noexcept(false)
 {
     using namespace ormpp;
     const auto& conf = ConfigReader::GetInstance();
@@ -33,13 +34,13 @@ SQLiteFilePropService::SQLiteFilePropService()
     }
 }
 
-bool SQLiteFilePropService::Set(const std::filesystem::path& path, const PropT& prop)
+bool SQLiteFilePropService::Set(const std::filesystem::path& path, const PropT& prop) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     return dbng_.insert<FilePropTable>({path_str, prop.first, prop.second}) == 1;
 }
 
-std::string SQLiteFilePropService::Get(const std::filesystem::path& path, const std::string& key)
+std::string SQLiteFilePropService::Get(const std::filesystem::path& path, const std::string& key) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     const auto query_res = dbng_.query_s<FilePropTable>(std::format("path='{}' and key='{}'", path_str, key));
@@ -52,7 +53,7 @@ std::string SQLiteFilePropService::Get(const std::filesystem::path& path, const 
     return query_res[0].value;
 }
 
-std::vector<PropT> SQLiteFilePropService::GetAll(const std::filesystem::path& path)
+std::vector<PropT> SQLiteFilePropService::GetAll(const std::filesystem::path& path) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     std::vector<PropT> props;
@@ -66,13 +67,13 @@ std::vector<PropT> SQLiteFilePropService::GetAll(const std::filesystem::path& pa
     return props;
 }
 
-bool SQLiteFilePropService::Remove(const std::filesystem::path& path, const std::string& key)
+bool SQLiteFilePropService::Remove(const std::filesystem::path& path, const std::string& key) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     return dbng_.delete_records_s<FilePropTable>(std::format("path='{}' and key='{}'", path_str, key));
 }
 
-bool SQLiteFilePropService::RemoveAll(const std::filesystem::path& path)
+bool SQLiteFilePropService::RemoveAll(const std::filesystem::path& path) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     return dbng_.delete_records_s<FilePropTable>(std::format("path='{}'", path_str));

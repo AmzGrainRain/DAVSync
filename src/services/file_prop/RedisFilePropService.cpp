@@ -12,7 +12,6 @@
 
 #include <hiredis/hiredis.h>
 
-#include "logger.hpp"
 #include "ConfigReader.h"
 #include "utils/path.h"
 
@@ -21,7 +20,7 @@ using namespace utils::redis;
 namespace FilePropService
 {
 
-RedisFilePropService::RedisFilePropService() : redis_ctx_(nullptr, &redisFree)
+RedisFilePropService::RedisFilePropService() noexcept(false) : redis_ctx_(nullptr, &redisFree)
 {
     const auto& conf = ConfigReader::GetInstance();
 
@@ -37,7 +36,7 @@ RedisFilePropService::RedisFilePropService() : redis_ctx_(nullptr, &redisFree)
     }
 }
 
-bool RedisFilePropService::Set(const std::filesystem::path& path, const std::pair<std::string, std::string>& prop)
+bool RedisFilePropService::Set(const std::filesystem::path& path, const std::pair<std::string, std::string>& prop) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format(R"(HSET prop:{} {} "{}")", path_str, prop.first, prop.second);
@@ -51,7 +50,7 @@ bool RedisFilePropService::Set(const std::filesystem::path& path, const std::pai
     return repl->integer == 1;
 }
 
-std::string RedisFilePropService::Get(const std::filesystem::path& path, const std::string& key)
+std::string RedisFilePropService::Get(const std::filesystem::path& path, const std::string& key) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format("HGET prop:{} {}", path_str, key);
@@ -65,7 +64,7 @@ std::string RedisFilePropService::Get(const std::filesystem::path& path, const s
     return {repl->str};
 }
 
-std::vector<PropT> RedisFilePropService::GetAll(const std::filesystem::path& path)
+std::vector<PropT> RedisFilePropService::GetAll(const std::filesystem::path& path) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format("HGETALL prop:{}", path_str);
@@ -85,7 +84,7 @@ std::vector<PropT> RedisFilePropService::GetAll(const std::filesystem::path& pat
     return prop_list;
 }
 
-bool RedisFilePropService::Remove(const std::filesystem::path& path, const std::string& key)
+bool RedisFilePropService::Remove(const std::filesystem::path& path, const std::string& key) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format("HDEL prop:{} {}", path_str, key);
@@ -99,7 +98,7 @@ bool RedisFilePropService::Remove(const std::filesystem::path& path, const std::
     return repl->integer == 1;
 }
 
-bool RedisFilePropService::RemoveAll(const std::filesystem::path& path)
+bool RedisFilePropService::RemoveAll(const std::filesystem::path& path) noexcept
 {
     const std::string path_str = utils::path::to_string(path);
     const std::string command = std::format("DEL prop:{}", path_str);

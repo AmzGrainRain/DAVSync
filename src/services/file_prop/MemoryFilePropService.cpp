@@ -17,7 +17,7 @@
 namespace FilePropService
 {
 
-MemoryFilePropService::MemoryFilePropService()
+MemoryFilePropService::MemoryFilePropService() noexcept(false)
 {
     const auto& conf = ConfigReader::GetInstance();
     const auto& data_path = conf.GetPropData();
@@ -90,12 +90,11 @@ MemoryFilePropService::MemoryFilePropService()
     data_.open(data_path, std::ios::out);
     if (!data_.is_open())
     {
-        LOG_ERROR_FMT("Unable to save file properties to '{}', file properties are lost when the server stops.",
-                      data_path_str);
+        LOG_ERROR_FMT("Unable to save file properties to '{}', file properties are lost when the server stops.", data_path_str);
     }
 }
 
-MemoryFilePropService::~MemoryFilePropService()
+MemoryFilePropService::~MemoryFilePropService() noexcept
 {
 
     if (!data_.is_open())
@@ -124,7 +123,7 @@ MemoryFilePropService::~MemoryFilePropService()
     LOG_ERROR_FMT("The file attributes have been saved to {}", utils::path::to_string(conf.GetPropData()));
 }
 
-bool MemoryFilePropService::Set(const std::filesystem::path& path, const PropT& prop)
+bool MemoryFilePropService::Set(const std::filesystem::path& path, const PropT& prop) noexcept
 {
     const auto& it = prop_map_.find(path);
     if (it == prop_map_.end())
@@ -136,7 +135,7 @@ bool MemoryFilePropService::Set(const std::filesystem::path& path, const PropT& 
     return true;
 }
 
-std::string MemoryFilePropService::Get(const std::filesystem::path& path, const std::string& key)
+std::string MemoryFilePropService::Get(const std::filesystem::path& path, const std::string& key) noexcept
 {
     const auto& it = prop_map_.find(path);
     if (it == prop_map_.end())
@@ -153,7 +152,7 @@ std::string MemoryFilePropService::Get(const std::filesystem::path& path, const 
     return {props.at(key)};
 }
 
-std::vector<PropT> MemoryFilePropService::GetAll(const std::filesystem::path& path)
+std::vector<PropT> MemoryFilePropService::GetAll(const std::filesystem::path& path) noexcept
 {
     const auto& it = prop_map_.find(path);
     if (it == prop_map_.end())
@@ -170,7 +169,7 @@ std::vector<PropT> MemoryFilePropService::GetAll(const std::filesystem::path& pa
     return props;
 }
 
-bool MemoryFilePropService::Remove(const std::filesystem::path& path, const std::string& key)
+bool MemoryFilePropService::Remove(const std::filesystem::path& path, const std::string& key) noexcept
 {
     const auto& it = prop_map_.find(path);
     if (it == prop_map_.end())
@@ -187,7 +186,7 @@ bool MemoryFilePropService::Remove(const std::filesystem::path& path, const std:
     return static_cast<size_t>(props.erase(key)) == 1;
 }
 
-bool MemoryFilePropService::RemoveAll(const std::filesystem::path& path)
+bool MemoryFilePropService::RemoveAll(const std::filesystem::path& path) noexcept
 {
     if (prop_map_.contains(path))
     {
