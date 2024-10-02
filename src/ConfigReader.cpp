@@ -74,7 +74,7 @@ static inline void ParseHttpsConfig(INIReader& ini, bool& enable, uint16_t& port
 
 static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::string& route_prefix, std::filesystem::path& absolute_data_path,
                                      std::filesystem::path& relative_data_path, int8_t& max_recurse_depth, std::string& realm,
-                                     std::string& verification, std::unordered_map<std::string, std::string>& users, bool& reset_lock)
+                                     std::string& verification, std::unordered_map<std::string, std::string>& users)
 {
     // webdav prefix
     prefix = ini.GetString("webdav", "prefix", "/webdav");
@@ -123,9 +123,6 @@ static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::s
     {
         users.emplace(utils::string::split2pair(user, '@'));
     }
-
-    // reset file lock during webdav server startup
-    reset_lock = ini.GetBoolean("webdav", "reset-lock", true);
 }
 
 static inline void ParseRedisConfig(INIReader& ini, std::string& host, uint16_t& port, std::string& user, std::string& passwd)
@@ -147,26 +144,22 @@ static inline void ParseRedisConfig(INIReader& ini, std::string& host, uint16_t&
     assert(!passwd.empty() && "[redis.password] Cannot be empty");
 }
 
-static inline void ParseEngineConfig(INIReader& ini, std::string& etag_engine, std::string& lock_engine, std::string& prop_engine)
+static inline void ParseEngineConfig(INIReader& ini, std::string& etag_engine, std::string& prop_engine)
 {
     std::unordered_set<std::string> engine_list{"memory", "sqlite", "redis"};
 
     etag_engine = ini.GetString("engine", "etag", "sqlite");
     assert(engine_list.contains(etag_engine) && "[engine.etag] Must be one of them [memory|sqlite|redis]");
 
-    lock_engine = ini.GetString("engine", "lock", "memory");
-    assert(engine_list.contains(lock_engine) && "[engine.lock] Must be one of them [memory|sqlite|redis]");
-
     prop_engine = ini.GetString("engine", "prop", "sqlite");
     assert(engine_list.contains(prop_engine) && "[engine.prop] Must be one of them [memory|sqlite|redis]");
 }
 
 static inline void ParseCacheConfig(INIReader& ini, std::filesystem::path& sqlite_db, std::filesystem::path& etag_data,
-                                    std::filesystem::path& lock_data, std::filesystem::path& prop_data)
+                                    std::filesystem::path& prop_data)
 {
     sqlite_db = ini.GetString("cache", "sqlite-db", "./data.db");
     etag_data = ini.GetString("cache", "etag-data", "./etag.dat");
-    lock_data = ini.GetString("cache", "lock-data", "./lock.dat");
     prop_data = ini.GetString("cache", "prop-data", "./prop.dat");
 }
 
@@ -203,7 +196,6 @@ inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::pa
     ofs << "realm = WebDavRealm\n";
     ofs << "verification = none\n";
     ofs << "users = test@admin\n";
-    ofs << "reset-lock = true\n";
     ofs << '\n';
 
     ofs << "[redis]\n";
@@ -215,14 +207,12 @@ inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::pa
 
     ofs << "[engine]\n";
     ofs << "etag = sqlite\n";
-    ofs << "lock = memory\n";
     ofs << "prop = sqlite\n";
     ofs << '\n';
 
     ofs << "[cache]\n";
     ofs << "sqlite-db = ./data.db\n";
     ofs << "etag-data = ./etag.dat\n";
-    ofs << "lock-data = ./lock.dat\n";
     ofs << "prop-data = ./prop.dat\n";
 
     ofs.flush();
@@ -255,13 +245,13 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
     ParseHttpsConfig(reader, https_enable_, https_port_, https_only_, ssl_cert_, ssl_key_);
 
     ParseWebDAVConfig(reader, webdav_prefix_, webdav_route_prefix_, webdav_absolute_data_path_, webdav_relative_data_path_, webdav_max_recurse_depth_,
-                      webdav_realm_, webdav_verification_, webdav_user_, webdav_reset_lock_);
+                      webdav_realm_, webdav_verification_, webdav_user_);
 
     ParseRedisConfig(reader, redis_host_, redis_port_, redis_username_, redis_password_);
 
-    ParseEngineConfig(reader, etag_engine_, lock_engine_, prop_engine_);
+    ParseEngineConfig(reader, etag_engine_, prop_engine_);
 
-    ParseCacheConfig(reader, sqlite_db_, etag_data_, lock_data_, prop_data_);
+    ParseCacheConfig(reader, sqlite_db_, etag_data_, prop_data_);
 }
 
 const std::filesystem::path& ConfigReader::GetCWD() const noexcept
@@ -400,11 +390,6 @@ std::string ConfigReader::GetWebDavUser(const std::string& user) const noexcept
     return it->second;
 }
 
-bool ConfigReader::GetWebDavResetLock() const noexcept
-{
-    return webdav_reset_lock_;
-}
-
 const std::string& ConfigReader::GetRedisHost() const noexcept
 {
     return redis_host_;
@@ -430,11 +415,6 @@ const std::string& ConfigReader::GetETagEngine() const noexcept
     return etag_engine_;
 }
 
-const std::string& ConfigReader::GetLockEngine() const noexcept
-{
-    return lock_engine_;
-}
-
 const std::string& ConfigReader::GetPropEngine() const noexcept
 {
     return prop_engine_;
@@ -448,11 +428,6 @@ const std::filesystem::path& ConfigReader::GetSQLiteDB() const noexcept
 const std::filesystem::path& ConfigReader::GetETagData() const noexcept
 {
     return etag_data_;
-}
-
-const std::filesystem::path& ConfigReader::GetLockData() const noexcept
-{
-    return lock_data_;
 }
 
 const std::filesystem::path& ConfigReader::GetPropData() const noexcept

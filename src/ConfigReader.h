@@ -39,7 +39,6 @@ class ConfigReader
     const std::string& GetWebDavRealm() const noexcept;
     const std::string& GetWebDavVerification() const noexcept;
     std::string GetWebDavUser(const std::string& user) const noexcept;
-    bool GetWebDavResetLock() const noexcept;
 
     const std::string& GetRedisHost() const noexcept;
     uint16_t GetRedisPort() const noexcept;
@@ -47,12 +46,10 @@ class ConfigReader
     const std::string& GetRedisPassword() const noexcept;
 
     const std::string& GetETagEngine() const noexcept;
-    const std::string& GetLockEngine() const noexcept;
     const std::string& GetPropEngine() const noexcept;
 
     const std::filesystem::path& GetSQLiteDB() const noexcept;
     const std::filesystem::path& GetETagData() const noexcept;
-    const std::filesystem::path& GetLockData() const noexcept;
     const std::filesystem::path& GetPropData() const noexcept;
 
   private:
@@ -78,7 +75,6 @@ class ConfigReader
     std::string webdav_realm_;
     std::string webdav_verification_;
     std::unordered_map<std::string, std::string> webdav_user_;
-    bool webdav_reset_lock_;
 
     std::string redis_host_;
     uint16_t redis_port_;
@@ -86,11 +82,9 @@ class ConfigReader
     std::string redis_password_;
 
     std::string etag_engine_;
-    std::string lock_engine_;
     std::string prop_engine_;
 
     std::filesystem::path sqlite_db_;
     std::filesystem::path etag_data_;
-    std::filesystem::path lock_data_;
     std::filesystem::path prop_data_;
 };
