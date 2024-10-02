@@ -1,49 +1,81 @@
 #include <algorithm>
+#include <cassert>
 #include <filesystem>
 #include <list>
-#include <iostream>
 #include <stdexcept>
 
-enum class EntryLockType
+template <class T>
+concept IsTimeType = std::is_same_v<T, std::chrono::nanoseconds> || std::is_same_v<T, std::chrono::microseconds> ||
+std::is_same_v<T, std::chrono::milliseconds> || std::is_same_v<T, std::chrono::seconds>;
+template <IsTimeType T = std::chrono::nanoseconds> T get_timestamp()
 {
-	NIL = 0,
-	SHARED,
+	using namespace std::chrono;
+	return duration_cast<T>(system_clock::now().time_since_epoch());
+}
+
+enum class LockScope
+{
+	SHARED = 0,
 	EXCLUSIVE
 };
 
-struct Entry
+enum class LockType
 {
-	EntryLockType lock = EntryLockType::NIL;
-	std::string name = "";
-	std::filesystem::path path = "/";
-	Entry* parent = nullptr;
-	std::list<Entry*>* children = nullptr;
+	WRITE = 0,
+	READ
+};
 
-	~Entry()
+struct EntryLock
+{
+	std::string token;
+	short depth = std::numeric_limits<short>::min();
+	LockScope scope = LockScope::SHARED;
+	LockType type = LockType::WRITE;
+	long long expires_at = 0;
+	long long creation_date = get_timestamp<std::chrono::seconds>().count();
+
+	EntryLock() = default;
+
+	EntryLock(const EntryLock& lock) noexcept
+		: token(lock.token), depth(lock.depth), scope(lock.scope), type(lock.type), expires_at(lock.expires_at), creation_date(lock.creation_date) {};
+
+	EntryLock(EntryLock&& lock) noexcept
+		: token(std::move(lock.token)), depth(lock.depth), scope(lock.scope), type(lock.type), expires_at(lock.expires_at),
+		creation_date(lock.creation_date) {};
+
+	~EntryLock() = default;
+
+	std::chrono::seconds ExpiresAt() const
 	{
-		if (children == nullptr)
+		return std::chrono::seconds{ expires_at };
+	}
+
+	std::chrono::seconds CreationDate() const
+	{
+		return std::chrono::seconds{ creation_date };
+	}
+};
+
+class Service
+{
+public:
+	Service()
+	{
+		root_ = new Entry();
+	}
+
+	~Service()
+	{
+		if (root_ == nullptr)
 		{
 			return;
 		}
 
-		for (Entry* it : *children)
-		{
-			delete it;
-		}
-		children = nullptr;
-	}
-};
-
-class LockService
-{
-public:
-	static LockService& GetInstance()
-	{
-		static LockService instance{};
-		return instance;
+		delete root_;
+		root_ = nullptr;
 	}
 
-	void Lock(const std::filesystem::path& path, EntryLockType lock_type)
+	void Lock(const std::filesystem::path& path, const EntryLock& lock)
 	{
 		std::list<std::string> cwd;
 		Entry* entry = root_;
@@ -106,7 +138,7 @@ public:
 			cwd.push_back(part_str);
 		}
 
-		entry->lock = lock_type;
+		entry->lock = new EntryLock(lock);
 	}
 
 	bool Unlock(const std::filesystem::path& path)
@@ -117,16 +149,17 @@ public:
 			return false;
 		}
 
-		entry->lock = EntryLockType::NIL;
+		delete entry->lock;
+		entry->lock = nullptr;
 		return true;
 	}
 
-	EntryLockType GetLock(const std::filesystem::path& path)
+	const EntryLock* GetLock(const std::filesystem::path& path)
 	{
-		Entry* entry = FindEntry(path);
+		const Entry* entry = FindLock(path);
 		if (entry == nullptr)
 		{
-			return EntryLockType::NIL;
+			return nullptr;
 		}
 
 		return entry->lock;
@@ -134,38 +167,45 @@ public:
 
 	bool IsLocked(const std::filesystem::path& path)
 	{
-		Entry* entry = root_;
+		const Entry* entry = FindLock(path);
 
-		std::string part_str;
-		for (const std::filesystem::path& part : path)
+		if (entry == nullptr || entry->lock == nullptr)
 		{
-			if (entry->lock != EntryLockType::NIL)
-			{
-				return true;
-			}
-
-			part_str = part.string();
-			if (part_str == "/")
-			{
-				continue;
-			}
-
-			auto* sub_entry = entry->children;
-			if (sub_entry == nullptr)
-			{
-				return false;
-			}
-
-			auto it = std::find_if(sub_entry->begin(), sub_entry->end(), [&part_str](const Entry* elm) { return elm->name == part_str; });
-			if (it == sub_entry->end())
-			{
-				return false;
-			}
-
-			entry = *it;
+			return false;
 		}
 
-		return entry->lock != EntryLockType::NIL;
+		if (entry->path == path)
+		{
+			return true;
+		}
+
+		short diff_depth = 0;
+		auto it1 = entry->path.begin();
+		auto it2 = path.begin();
+		while (it1 != entry->path.end() && it2 != path.end())
+		{
+			++it1;
+			++it2;
+		}
+
+		if (it1 == entry->path.end())
+		{
+			while (it2 != path.end())
+			{
+				++it2;
+				diff_depth += 1;
+			}
+		}
+		else
+		{
+			while (it1 != entry->path.end())
+			{
+				++it1;
+				diff_depth += 1;
+			}
+		}
+
+		return entry->lock->depth >= diff_depth;
 	}
 
 	bool LockExists(const std::filesystem::path& path)
@@ -173,22 +213,38 @@ public:
 		return FindEntry(path) != nullptr;
 	}
 
-	~LockService()
-	{
-		if (root_ == nullptr)
-		{
-			return;
-		}
-
-		delete root_;
-		root_ = nullptr;
-	}
-
 private:
-	LockService()
+	struct Entry
 	{
-		root_ = new Entry();
-	}
+		std::string name = "";
+		std::filesystem::path path = "/";
+
+		EntryLock* lock = nullptr;
+		Entry* parent = nullptr;
+		std::list<Entry*>* children = nullptr;
+
+		Entry() = default;
+		~Entry()
+		{
+			if (lock != nullptr)
+			{
+				delete lock;
+				lock = nullptr;
+			}
+
+			if (children == nullptr)
+			{
+				return;
+			}
+
+			for (Entry* it : *children)
+			{
+				delete it;
+			}
+            delete children;
+			children = nullptr;
+		}
+	};
 
 	Entry* FindEntry(const std::filesystem::path& path)
 	{
@@ -221,39 +277,81 @@ private:
 		return entry;
 	}
 
+	const Service::Entry* FindLock(const std::filesystem::path& path)
+	{
+		Entry* entry = root_;
+
+		std::string part_str;
+		for (const std::filesystem::path& part : path)
+		{
+			if (entry->lock != nullptr)
+			{
+				return entry;
+			}
+
+			part_str = part.string();
+			if (part_str == "/")
+			{
+				continue;
+			}
+
+			auto* sub_entry = entry->children;
+			if (sub_entry == nullptr)
+			{
+				return nullptr;
+			}
+
+			auto it = std::find_if(sub_entry->begin(), sub_entry->end(), [&part_str](const Entry* elm) { return elm->name == part_str; });
+			if (it == sub_entry->end())
+			{
+				return nullptr;
+			}
+
+			entry = *it;
+		}
+
+		return entry;
+	}
+
 	Entry* root_ = nullptr;
 };
 
+void test()
+{
+	Service service{};
+
+	{ // set lock
+		EntryLock lock;
+		lock.depth = 3;
+		lock.token = "123";
+		service.Lock("/a/b", std::move(lock));
+	}
+
+	{ // locked
+		assert(service.IsLocked("/a/b"));
+		assert(service.IsLocked("/a/b/c/d/e"));
+		assert(!service.IsLocked("/a/b/c/d/e/f"));
+	}
+
+	{ // get lock
+		const EntryLock* lock = service.GetLock("/a/b");
+		assert(lock != nullptr);
+	}
+
+	{ // unlock
+		assert(service.Unlock("/a/b"));
+	}
+
+	{ // locked
+		assert(!service.IsLocked("/a/b"));
+		assert(!service.IsLocked("/a/b/c/d/e"));
+		assert(!service.IsLocked("/a/b/c/d/e/f"));
+	}
+}
+
 int main()
 {
-	auto& lock = LockService::GetInstance();
-
-	lock.Lock("/a/b", EntryLockType::EXCLUSIVE);
-	std::cout << "/a/b -> LOCKED" << std::endl;
-
-
-	if (lock.IsLocked("/a/b/c/d"))
-	{
-		std::cout << "/a/b/c/d -> LOCKED" << std::endl;
-	}
-	else
-	{
-		std::cout << "/a/b/c/d -> UNLOCKED" << std::endl;
-	}
-
-
-	switch (lock.GetLock("/a/b"))
-	{
-	case EntryLockType::NIL:
-		std::cout << "/a/b -> UNLOCKED" << std::endl;
-		break;
-	case EntryLockType::SHARED:
-		std::cout << "/a/b -> SHARED LOCK" << std::endl;
-		break;
-	case EntryLockType::EXCLUSIVE:
-		std::cout << "/a/b -> EXCLUSIVE LOCK" << std::endl;
-		break;
-	}
+	test();
 
 	return 0;
 }
