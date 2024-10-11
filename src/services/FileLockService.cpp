@@ -1,8 +1,14 @@
 #include "FileLockService.h"
-#include "utils.h"
+
 #include <cassert>
 #include <chrono>
 #include <filesystem>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "utils.h"
 
 namespace FileLock
 {
@@ -11,10 +17,11 @@ namespace FileLock
 /*  struct Lock  */
 /*****************/
 EntryLock::EntryLock(const EntryLock& lock)
-    : token(lock.token), depth(lock.depth), scope(lock.scope), type(lock.type), expires_at(lock.expires_at), creation_date(lock.creation_date) {};
+    : user(lock.user), token(lock.token), depth(lock.depth), scope(lock.scope), type(lock.type), expires_at(lock.expires_at),
+      creation_date(lock.creation_date) {};
 
 EntryLock::EntryLock(EntryLock&& lock)
-    : token(std::move(lock.token)), depth(lock.depth), scope(lock.scope), type(lock.type), expires_at(lock.expires_at),
+    : user(std::move(lock.user)), token(std::move(lock.token)), depth(lock.depth), scope(lock.scope), type(lock.type), expires_at(lock.expires_at),
       creation_date(lock.creation_date) {};
 
 std::chrono::seconds EntryLock::ExpiresAt() const
@@ -34,21 +41,20 @@ Service::Entry::~Entry()
 {
     if (lock != nullptr)
     {
+        for (auto& pair : *lock)
+            delete pair.second;
+        lock->clear();
         delete lock;
         lock = nullptr;
     }
 
-    if (children == nullptr)
+    if (children != nullptr)
     {
-        return;
+        for (Entry* it : *children)
+            delete it;
+        delete children;
+        children = nullptr;
     }
-
-    for (Entry* it : *children)
-    {
-        delete it;
-    }
-    delete children;
-    children = nullptr;
 }
 
 /*******************/
@@ -60,13 +66,13 @@ Service& Service::GetInstance()
     return instance;
 }
 
-void Service::Lock(const std::filesystem::path& path, const EntryLock& lock)
+bool Service::Lock(const fs::path& path, const EntryLock& lock)
 {
     std::list<std::string> cwd;
     Entry* entry = root_;
     std::string part_str;
 
-    for (const std::filesystem::path& part : path)
+    for (const fs::path& part : path)
     {
         part_str = part.string();
 
@@ -94,17 +100,17 @@ void Service::Lock(const std::filesystem::path& path, const EntryLock& lock)
             continue;
         }
 
-        std::list<Entry*>* sub_entry = entry->children;
+        EntryListT* sub_entry = entry->children;
         if (sub_entry == nullptr)
         {
-            entry->children = new std::list<Entry*>();
-            sub_entry = entry->children;
+            sub_entry = new EntryListT();
+            entry->children = sub_entry;
         }
 
         auto it = std::find_if(sub_entry->begin(), sub_entry->end(), [&part_str](const Entry* elm) { return elm->name == part_str; });
         if (it == sub_entry->end())
         {
-            auto new_entry = new Entry{};
+            auto* new_entry = new Entry();
             new_entry->name = part_str;
             for (const std::string& str : cwd)
             {
@@ -123,10 +129,100 @@ void Service::Lock(const std::filesystem::path& path, const EntryLock& lock)
         cwd.push_back(part_str);
     }
 
-    entry->lock = new EntryLock(lock);
+    if (entry->lock == nullptr)
+    {
+        entry->lock = new LockListT{{std::string{lock.user}, new EntryLock(lock)}};
+        return true;
+    }
+
+    if (entry->lock->contains(lock.user))
+    {
+        return false;
+    }
+
+    entry->lock->insert({std::string{lock.user}, new EntryLock(lock)});
+    return true;
 }
 
-bool Service::Unlock(const std::filesystem::path& path)
+bool Service::Lock(const fs::path& path, EntryLock&& lock)
+{
+    std::list<std::string> cwd;
+    Entry* entry = root_;
+    std::string part_str;
+
+    for (const fs::path& part : path)
+    {
+        part_str = part.string();
+
+        if (part_str == "/")
+        {
+            entry = root_;
+            cwd.clear();
+            cwd.push_back("/");
+            continue;
+        }
+
+        if (part_str == ".")
+        {
+            continue;
+        }
+
+        if (part_str == "..")
+        {
+            if (entry->parent == nullptr)
+            {
+                throw std::runtime_error("Illegial path.");
+            }
+            entry = entry->parent;
+            cwd.pop_back();
+            continue;
+        }
+
+        EntryListT* sub_entry = entry->children;
+        if (sub_entry == nullptr)
+        {
+            sub_entry = new EntryListT();
+            entry->children = sub_entry;
+        }
+
+        auto it = std::find_if(sub_entry->begin(), sub_entry->end(), [&part_str](const Entry* elm) { return elm->name == part_str; });
+        if (it == sub_entry->end())
+        {
+            auto* new_entry = new Entry();
+            new_entry->name = part_str;
+            for (const std::string& str : cwd)
+            {
+                new_entry->path /= str;
+            }
+            new_entry->path /= part_str;
+            new_entry->parent = entry;
+            sub_entry->push_back(new_entry);
+
+            entry = new_entry;
+            cwd.push_back(part_str);
+            continue;
+        }
+
+        entry = *it;
+        cwd.push_back(part_str);
+    }
+
+    if (entry->lock == nullptr)
+    {
+        entry->lock = new LockListT{{std::string{lock.user}, new EntryLock(std::forward<EntryLock&&>(lock))}};
+        return true;
+    }
+
+    if (entry->lock->contains(lock.user))
+    {
+        return false;
+    }
+
+    entry->lock->insert({std::string{lock.user}, new EntryLock(std::forward<EntryLock&&>(lock))});
+    return true;
+}
+
+bool Service::Unlock(const fs::path& path, const std::string& user)
 {
     Entry* entry = FindEntry(path);
     if (entry == nullptr)
@@ -134,15 +230,46 @@ bool Service::Unlock(const std::filesystem::path& path)
         return false;
     }
 
-    delete entry->lock;
-    entry->lock = nullptr;
+    if (entry->lock == nullptr) // lazy clean
+    {
+        delete entry;
+        return false;
+    }
+
+    if (!entry->lock->contains(user))
+    {
+        return false;
+    }
+
+    entry->lock->erase(user);
+    if (entry->lock->empty()) // lazy clean
+        delete entry;
     return true;
 }
 
-const EntryLock* Service::GetLock(const std::filesystem::path& path)
+const EntryLock* Service::GetLock(const fs::path& path, const std::string& user)
 {
-    const Entry* entry = FindLock(path);
+    Entry* entry = FindLock(path);
+    assert(entry->lock != nullptr);
+
     if (entry == nullptr)
+    {
+        return nullptr;
+    }
+
+    auto it = entry->lock->find(user);
+    if (it == entry->lock->end())
+    {
+        return nullptr;
+    }
+
+    return (*it).second;
+}
+
+const Service::LockListT* Service::GetAllLock(const fs::path& path)
+{
+    Entry* entry = FindLock(path);
+    if (entry == nullptr || entry->lock == nullptr)
     {
         return nullptr;
     }
@@ -150,11 +277,10 @@ const EntryLock* Service::GetLock(const std::filesystem::path& path)
     return entry->lock;
 }
 
-bool Service::IsLocked(const std::filesystem::path& path, bool by_parent)
+bool Service::IsLocked(const fs::path& path, bool by_parent)
 {
     Entry* entry = FindLock(path, by_parent);
-
-    if (entry == nullptr || entry->lock == nullptr)
+    if (entry == nullptr || entry->lock->empty())
     {
         return false;
     }
@@ -191,18 +317,38 @@ bool Service::IsLocked(const std::filesystem::path& path, bool by_parent)
     }
 
     auto now_sec = utils::get_timestamp<std::chrono::seconds>().count();
-    if (entry->lock->expires_at < now_sec)
+    short max_depth = std::numeric_limits<short>::min();
+
+    // list for expired lock
+    std::vector<std::string> expired_lock;
+    for (const auto& it : *(entry->lock))
     {
-        // lazy clean
-        delete entry->lock;
-        entry->lock = nullptr;
+        // If the lock has expired, mark it
+        if (it.second->expires_at < now_sec)
+        {
+            expired_lock.push_back(it.first);
+            continue;
+        }
+        // Considering that there will be multiple locks, we will use the lock with the highest depth value as the reference
+        max_depth = std::max(max_depth, it.second->depth);
+    }
+
+    // Clean up locks marked as expired
+    for (const auto& k : expired_lock)
+    {
+        entry->lock->erase(k);
+    }
+
+    // Are all the locks expired?
+    if (entry->lock->empty())
+    {
         return false;
     }
 
-    return entry->lock->depth >= diff_depth;
+    return max_depth >= diff_depth;
 }
 
-bool Service::LockExists(const std::filesystem::path& path)
+bool Service::LockExists(const fs::path& path)
 {
     return FindEntry(path) != nullptr;
 }
@@ -223,12 +369,12 @@ Service::~Service()
     root_ = nullptr;
 }
 
-Service::Entry* Service::FindEntry(const std::filesystem::path& path)
+Service::Entry* Service::FindEntry(const fs::path& path)
 {
     Entry* entry = root_;
 
     std::string part_str;
-    for (const std::filesystem::path& part : path)
+    for (const fs::path& part : path)
     {
         part_str = part.string();
         if (part_str == "/")
@@ -254,12 +400,12 @@ Service::Entry* Service::FindEntry(const std::filesystem::path& path)
     return entry;
 }
 
-Service::Entry* Service::FindLock(const std::filesystem::path& path, bool by_parent)
+Service::Entry* Service::FindLock(const fs::path& path, bool by_parent)
 {
     Entry* entry = root_;
 
     std::string part_str;
-    for (const std::filesystem::path& part : path)
+    for (const fs::path& part : path)
     {
         if (by_parent && entry->lock != nullptr)
         {
@@ -285,6 +431,12 @@ Service::Entry* Service::FindLock(const std::filesystem::path& path, bool by_par
         }
 
         entry = *it;
+    }
+
+    // entry is not nullptr forever.
+    if (entry->lock == nullptr)
+    {
+        return nullptr;
     }
 
     return entry;

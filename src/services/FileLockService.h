@@ -1,11 +1,14 @@
 #include <filesystem>
-#include <list>
 #include <limits>
+#include <list>
+#include <unordered_map>
 
 #include "utils.h"
 
 namespace FileLock
 {
+
+namespace fs = std::filesystem;
 
 enum class LockScope
 {
@@ -21,6 +24,7 @@ enum class LockType
 
 struct EntryLock
 {
+    std::string user;
     std::string token;
     short depth = std::numeric_limits<short>::min();
     LockScope scope = LockScope::SHARED;
@@ -43,28 +47,38 @@ struct EntryLock
 
 class Service
 {
+  private:
+    struct Entry;
+
   public:
+    using LockListT = std::unordered_map<std::string, EntryLock*>;
+    using EntryListT = std::list<Entry*>;
+
     static Service& GetInstance();
 
-    void Lock(const std::filesystem::path& path, const EntryLock& lock);
+    bool Lock(const fs::path& path, const EntryLock& lock);
 
-    bool Unlock(const std::filesystem::path& path);
+    bool Lock(const fs::path& path, EntryLock&& lock);
 
-    const EntryLock* GetLock(const std::filesystem::path& path);
+    bool Unlock(const fs::path& path, const std::string& user);
 
-    bool IsLocked(const std::filesystem::path& path, bool by_parent = true);
+    const EntryLock* GetLock(const fs::path& path, const std::string& user);
 
-    bool LockExists(const std::filesystem::path& path);
+    const LockListT* GetAllLock(const fs::path& path);
+
+    bool IsLocked(const fs::path& path, bool by_parent = true);
+
+    bool LockExists(const fs::path& path);
 
   private:
     struct Entry
     {
         std::string name = "";
-        std::filesystem::path path = "/";
+        fs::path path = "/";
 
         Entry* parent = nullptr;
-        EntryLock* lock = nullptr;
-        std::list<Entry*>* children = nullptr;
+        LockListT* lock = nullptr;
+        EntryListT* children = nullptr;
 
         Entry() = default;
         ~Entry();
@@ -74,9 +88,9 @@ class Service
 
     ~Service();
 
-    Entry* FindEntry(const std::filesystem::path& path);
+    Entry* FindEntry(const fs::path& path);
 
-    Entry* FindLock(const std::filesystem::path& path, bool by_parent = true);
+    Entry* FindLock(const fs::path& path, bool by_parent = true);
 
     Entry* root_ = nullptr;
 };
