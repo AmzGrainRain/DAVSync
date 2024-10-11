@@ -1,4 +1,5 @@
 #include "FileLockService.h"
+#include "utils.h"
 #include <cassert>
 #include <chrono>
 #include <filesystem>
@@ -151,7 +152,7 @@ const EntryLock* Service::GetLock(const std::filesystem::path& path)
 
 bool Service::IsLocked(const std::filesystem::path& path)
 {
-    const Entry* entry = FindLock(path);
+    Entry* entry = FindLock(path);
     if (entry == nullptr || entry->lock == nullptr)
     {
         return false;
@@ -185,6 +186,14 @@ bool Service::IsLocked(const std::filesystem::path& path)
             ++it1;
             diff_depth += 1;
         }
+    }
+
+    auto now_sec = utils::get_timestamp<std::chrono::seconds>().count();
+    if (entry->lock->expires_at < now_sec)
+    {
+        delete entry->lock;
+        entry->lock = nullptr;
+        return false;
     }
 
     return entry->lock->depth >= diff_depth;
@@ -242,7 +251,7 @@ Service::Entry* Service::FindEntry(const std::filesystem::path& path)
     return entry;
 }
 
-const Service::Entry* Service::FindLock(const std::filesystem::path& path)
+Service::Entry* Service::FindLock(const std::filesystem::path& path)
 {
     Entry* entry = root_;
 

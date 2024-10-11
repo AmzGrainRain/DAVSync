@@ -76,7 +76,7 @@ class Service
 
     Entry* FindEntry(const std::filesystem::path& path);
 
-    const Entry* FindLock(const std::filesystem::path& path);
+    Entry* FindLock(const std::filesystem::path& path);
 
     Entry* root_ = nullptr;
 };
