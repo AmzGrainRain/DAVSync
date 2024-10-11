@@ -52,7 +52,7 @@ class Service
 
     const EntryLock* GetLock(const std::filesystem::path& path);
 
-    bool IsLocked(const std::filesystem::path& path);
+    bool IsLocked(const std::filesystem::path& path, bool by_parent = true);
 
     bool LockExists(const std::filesystem::path& path);
 
@@ -62,8 +62,8 @@ class Service
         std::string name = "";
         std::filesystem::path path = "/";
 
-        EntryLock* lock = nullptr;
         Entry* parent = nullptr;
+        EntryLock* lock = nullptr;
         std::list<Entry*>* children = nullptr;
 
         Entry() = default;
@@ -76,7 +76,7 @@ class Service
 
     Entry* FindEntry(const std::filesystem::path& path);
 
-    Entry* FindLock(const std::filesystem::path& path);
+    Entry* FindLock(const std::filesystem::path& path, bool by_parent = true);
 
     Entry* root_ = nullptr;
 };

@@ -150,13 +150,15 @@ const EntryLock* Service::GetLock(const std::filesystem::path& path)
     return entry->lock;
 }
 
-bool Service::IsLocked(const std::filesystem::path& path)
+bool Service::IsLocked(const std::filesystem::path& path, bool by_parent)
 {
-    Entry* entry = FindLock(path);
+    Entry* entry = FindLock(path, by_parent);
+
     if (entry == nullptr || entry->lock == nullptr)
     {
         return false;
     }
+
     if (entry->path == path)
     {
         return true;
@@ -191,6 +193,7 @@ bool Service::IsLocked(const std::filesystem::path& path)
     auto now_sec = utils::get_timestamp<std::chrono::seconds>().count();
     if (entry->lock->expires_at < now_sec)
     {
+        // lazy clean
         delete entry->lock;
         entry->lock = nullptr;
         return false;
@@ -251,14 +254,14 @@ Service::Entry* Service::FindEntry(const std::filesystem::path& path)
     return entry;
 }
 
-Service::Entry* Service::FindLock(const std::filesystem::path& path)
+Service::Entry* Service::FindLock(const std::filesystem::path& path, bool by_parent)
 {
     Entry* entry = root_;
 
     std::string part_str;
     for (const std::filesystem::path& part : path)
     {
-        if (entry->lock != nullptr)
+        if (by_parent && entry->lock != nullptr)
         {
             return entry;
         }
