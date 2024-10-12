@@ -114,8 +114,8 @@ static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::s
 
     // webdav verification type
     verification = ini.GetString("wevdav", "verification", "none");
-    assert((verification == "basic" || verification == "digest" || verification == "none") &&
-           "[webdav.verification] Must be one of them [basic|digest|none]");
+    assert((verification == "basic" || verification == "digest") &&
+           "[webdav.verification] Must be one of them [basic|digest]");
 
     // webdav user list
     const std::string user_list_raw = ini.GetString("webdav", "users", "");
