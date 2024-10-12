@@ -323,23 +323,23 @@ bool Service::IsLocked(const fs::path& path, bool by_parent)
     std::vector<std::string> expired_lock;
     for (const auto& it : *(entry->lock))
     {
-        // If the lock has expired, mark it
+        // if the lock has expired, mark it
         if (it.second->expires_at < now_sec)
         {
             expired_lock.push_back(it.first);
             continue;
         }
-        // Considering that there will be multiple locks, we will use the lock with the highest depth value as the reference
+        // considering that there will be multiple locks, we will use the lock with the highest depth value as the reference
         max_depth = std::max(max_depth, it.second->depth);
     }
 
-    // Clean up locks marked as expired
+    // clean up locks marked as expired
     for (const auto& k : expired_lock)
     {
         entry->lock->erase(k);
     }
 
-    // Are all the locks expired?
+    // are all the locks expired?
     if (entry->lock->empty())
     {
         return false;

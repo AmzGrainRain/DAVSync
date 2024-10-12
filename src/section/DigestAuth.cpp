@@ -16,15 +16,13 @@ inline static void RequestVerification(cinatra::coro_http_response& res) noexcep
 {
     const auto& conf = ConfigReader::GetInstance();
 
-    const std::string header_content =
-        std::format("Digest realm=\"{}\", qio=\"auth\", nonce=\"{}\", opaque=\"{}\", algorithm=\"SHA-256\"",
-                    conf.GetWebDavRealm(), utils::generate_unique_key(), utils::generate_unique_key());
+    const std::string header_content = std::format("Digest realm=\"{}\", qio=\"auth\", nonce=\"{}\", opaque=\"{}\", algorithm=\"SHA-256\"",
+                                                   conf.GetWebDavRealm(), utils::generate_unique_key(), utils::generate_unique_key());
     res.add_header("WWW-Authenticate", header_content);
     res.set_status(cinatra::status_type::unauthorized);
 }
 
-inline static auto ParseAuthorizationHeader(const std::string_view& text_view) noexcept
-    -> std::unordered_map<std::string, std::string>
+inline static auto ParseAuthorizationHeader(const std::string_view& text_view) noexcept -> std::unordered_map<std::string, std::string>
 {
     std::unordered_map<std::string, std::string> map{};
     std::string text{text_view};
@@ -104,13 +102,17 @@ bool DigestAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_resp
         const std::string HA2 = ComputeHA2(req.get_method(), req.get_url());
 
         // HA1:nonce:nc:conce:qop:HA2
-        const std::string RESPONSE = utils::sha256(
-            std::format("{}:{}:{}:{}:{}:{}", HA1, nonce->second, nc->second, conce->second, qop->second, HA2));
+        const std::string RESPONSE = utils::sha256(std::format("{}:{}:{}:{}:{}:{}", HA1, nonce->second, nc->second, conce->second, qop->second, HA2));
         if (map.find("response")->second != RESPONSE)
         {
             RequestVerification(res);
             return false;
         }
+
+        // save username, which plays an important role in the future
+        req.set_aspect_data(username->second);
+
+        return true;
     }
     catch (const std::exception& err)
     {
@@ -118,8 +120,6 @@ bool DigestAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_resp
         res.set_status(cinatra::status_type::bad_request);
         return false;
     }
-
-    return true;
 }
 
 bool DigestAuth::after(cinatra::coro_http_request& req, cinatra::coro_http_response& res)

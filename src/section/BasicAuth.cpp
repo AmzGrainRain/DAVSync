@@ -57,6 +57,9 @@ bool BasicAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_respo
             return false;
         }
 
+        // save username, which plays an important role in the future
+        req.set_aspect_data(client_user.first);
+
         return true;
     }
     catch (const std::exception& err)
