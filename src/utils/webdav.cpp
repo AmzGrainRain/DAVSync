@@ -4,8 +4,10 @@
 #include <chrono>
 #include <filesystem>
 #include <format>
+#include <limits>
 #include <mutex>
 #include <stack>
+#include <string>
 #include <utility>
 
 #include <PicoSHA2/picosha2.h>
@@ -49,9 +51,7 @@ void generate_response(pugi::xml_node& multistatus, const std::filesystem::path&
     }
     else
     {
-        xml_prop.append_child("D:getcontentlength")
-            .text()
-            .set(std::to_string(std::filesystem::file_size(path)).c_str());
+        xml_prop.append_child("D:getcontentlength").text().set(std::to_string(std::filesystem::file_size(path)).c_str());
 
         auto file_time = std::chrono::clock_cast<std::chrono::system_clock>(std::filesystem::last_write_time(path));
         std::time_t file_time_t = std::chrono::system_clock::to_time_t(file_time);
@@ -86,8 +86,7 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std:
         for (const auto& entry : fs::directory_iterator(dirs.top()))
         {
             auto xml_res = multistatus.append_child("D:response");
-            std::string file_path =
-                utils::path::with_separator(fs::relative(entry, std::filesystem::current_path()), 1, entry.is_directory(), '/');
+            std::string file_path = utils::path::with_separator(fs::relative(entry, std::filesystem::current_path()), 1, entry.is_directory(), '/');
             file_path.insert(file_path.begin(), '/');
             xml_res.append_child("D:href").text().set(file_path.c_str());
 
@@ -122,6 +121,54 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, const std::file
     std::stack<std::filesystem::path> stack;
     stack.push(path);
     generate_response_list_recurse(multistatus, std::move(stack), depth);
+}
+
+std::string lock_token_to_urn(const std::string& token)
+{
+    return std::format("urn:sha256:{}", token);
+}
+
+std::string urn_to_lock_token(const std::string& urn_str)
+{
+    if (!urn_str.starts_with("urn:sha256:"))
+    {
+        return {};
+    }
+
+    size_t pos = urn_str.find_first_of("urn:sha256:");
+    if (pos == std::string::npos || pos + 1 >= urn_str.length())
+    {
+        return {};
+    }
+
+    return urn_str.substr(pos + 1);
+}
+
+long long parse_timeout_header(const std::string_view& timeout_header_str)
+{
+    constexpr auto err_value = std::numeric_limits<long long>::min();
+
+    if (timeout_header_str == "Infinite")
+    {
+        return std::numeric_limits<long long>::max();
+    }
+
+    if (timeout_header_str.starts_with("Second-"))
+    {
+        size_t pos = timeout_header_str.find("Second-");
+        if (pos == std::string_view::npos)
+        {
+            return err_value;
+        }
+
+        std::string timeout_str{timeout_header_str.substr(pos + 1)};
+        if (!timeout_str.empty())
+        {
+            return std::stoll(timeout_str);
+        }
+    }
+
+    return err_value;
 }
 
 } // namespace utils::webdav
