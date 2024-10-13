@@ -17,12 +17,12 @@ namespace FileLock
 /*  struct Lock  */
 /*****************/
 EntryLock::EntryLock(const EntryLock& lock)
-    : user(lock.user), token(lock.token), depth(lock.depth), scope(lock.scope), type(lock.type), expires_at(lock.expires_at),
-      creation_date(lock.creation_date) {};
+    : user(lock.user), token(lock.token), description(lock.description), depth(lock.depth), scope(lock.scope), type(lock.type),
+      expires_at(lock.expires_at), creation_date(lock.creation_date) {};
 
 EntryLock::EntryLock(EntryLock&& lock)
-    : user(std::move(lock.user)), token(std::move(lock.token)), depth(lock.depth), scope(lock.scope), type(lock.type), expires_at(lock.expires_at),
-      creation_date(lock.creation_date) {};
+    : user(std::move(lock.user)), token(std::move(lock.token)), description(std::move(lock.description)), depth(lock.depth), scope(lock.scope),
+      type(lock.type), expires_at(lock.expires_at), creation_date(lock.creation_date) {};
 
 std::chrono::seconds EntryLock::ExpiresAt() const
 {
@@ -348,9 +348,23 @@ bool Service::IsLocked(const fs::path& path, bool by_parent)
     return max_depth >= diff_depth;
 }
 
-bool Service::LockExists(const fs::path& path)
+bool Service::HoldingExclusiveLock(const fs::path& path)
 {
-    return FindEntry(path) != nullptr;
+    const auto* all_lock = GetAllLock(path);
+    if (all_lock == nullptr)
+    {
+        return false;
+    }
+
+    for (const auto& item : *all_lock)
+    {
+        if (item.second->scope == FileLock::LockScope::EXCLUSIVE)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 Service::Service()

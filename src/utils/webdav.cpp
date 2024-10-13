@@ -8,9 +8,10 @@
 #include <stack>
 #include <utility>
 
+#include <PicoSHA2/picosha2.h>
+
 #include "path.h"
 #include "utils/path.h"
-#include <PicoSHA2/picosha2.h>
 
 std::mutex utils_webdav_ComputeEtag_LOCK;
 

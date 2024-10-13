@@ -26,6 +26,7 @@ struct EntryLock
 {
     std::string user;
     std::string token;
+    std::string description;
     short depth = std::numeric_limits<short>::min();
     LockScope scope = LockScope::SHARED;
     LockType type = LockType::WRITE;
@@ -68,7 +69,7 @@ class Service
 
     bool IsLocked(const fs::path& path, bool by_parent = true);
 
-    bool LockExists(const fs::path& path);
+    bool HoldingExclusiveLock(const fs::path& path);
 
   private:
     struct Entry
