@@ -7,11 +7,11 @@ namespace Section
 {
 
 // get_aspect_data[0] is username
-struct DigestAuth
+struct RequireXMLBody
 {
     bool before(cinatra::coro_http_request& req, cinatra::coro_http_response& res);
 
     bool after(cinatra::coro_http_request& req, cinatra::coro_http_response& res);
 };
 
-} // namespace Middleware
+} // namespace Section

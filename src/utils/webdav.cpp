@@ -4,7 +4,6 @@
 #include <chrono>
 #include <filesystem>
 #include <format>
-#include <limits>
 #include <mutex>
 #include <stack>
 #include <string>
@@ -121,54 +120,6 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, const std::file
     std::stack<std::filesystem::path> stack;
     stack.push(path);
     generate_response_list_recurse(multistatus, std::move(stack), depth);
-}
-
-std::string lock_token_to_urn(const std::string& token)
-{
-    return std::format("urn:sha256:{}", token);
-}
-
-std::string urn_to_lock_token(const std::string& urn_str)
-{
-    if (!urn_str.starts_with("urn:sha256:"))
-    {
-        return {};
-    }
-
-    size_t pos = urn_str.find_first_of("urn:sha256:");
-    if (pos == std::string::npos || pos + 1 >= urn_str.length())
-    {
-        return {};
-    }
-
-    return urn_str.substr(pos + 1);
-}
-
-long long parse_timeout_header(const std::string_view& timeout_header_str)
-{
-    constexpr auto err_value = std::numeric_limits<long long>::min();
-
-    if (timeout_header_str == "Infinite")
-    {
-        return std::numeric_limits<long long>::max();
-    }
-
-    if (timeout_header_str.starts_with("Second-"))
-    {
-        size_t pos = timeout_header_str.find("Second-");
-        if (pos == std::string_view::npos)
-        {
-            return err_value;
-        }
-
-        std::string timeout_str{timeout_header_str.substr(pos + 1)};
-        if (!timeout_str.empty())
-        {
-            return std::stoll(timeout_str);
-        }
-    }
-
-    return err_value;
 }
 
 } // namespace utils::webdav

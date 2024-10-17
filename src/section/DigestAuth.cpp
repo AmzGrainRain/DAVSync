@@ -110,7 +110,7 @@ bool DigestAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_resp
         }
 
         // save username, which plays an important role in the future
-        req.set_aspect_data(username->second);
+        req.set_aspect_data(std::move(username->second));
 
         return true;
     }

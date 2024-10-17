@@ -26,6 +26,7 @@
 
 #include "ConfigReader.h"
 #include "logger.hpp"
+#include "section/RequireXMLBody.h"
 
 
 int main()
@@ -56,7 +57,7 @@ int main()
             app.set_http_handler<MKCOL>(webdav_prefix, R::MKCOL, Section::BasicAuth{});
             app.set_http_handler<COPY>(webdav_prefix, R::COPY, Section::BasicAuth{});
             app.set_http_handler<MOVE>(webdav_prefix, R::MOVE, Section::BasicAuth{});
-            app.set_http_handler<LOCK>(webdav_prefix, R::LOCK, Section::BasicAuth{});
+            app.set_http_handler<LOCK>(webdav_prefix, R::LOCK, Section::BasicAuth{}, Section::RequireXMLBody{});
             app.set_http_handler<UNLOCK>(webdav_prefix, R::UNLOCK, Section::BasicAuth{});
         }
         else if (verify == "digest")
@@ -72,7 +73,7 @@ int main()
             app.set_http_handler<MKCOL>(webdav_prefix, R::MKCOL, Section::DigestAuth{});
             app.set_http_handler<COPY>(webdav_prefix, R::COPY, Section::DigestAuth{});
             app.set_http_handler<MOVE>(webdav_prefix, R::MOVE, Section::DigestAuth{});
-            app.set_http_handler<LOCK>(webdav_prefix, R::LOCK, Section::DigestAuth{});
+            app.set_http_handler<LOCK>(webdav_prefix, R::LOCK, Section::DigestAuth{}, Section::RequireXMLBody{});
             app.set_http_handler<UNLOCK>(webdav_prefix, R::UNLOCK, Section::DigestAuth{});
         }
         else
