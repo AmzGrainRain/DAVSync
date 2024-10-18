@@ -23,13 +23,10 @@ std::mutex utils_webdav_ComputeEtag_LOCK;
 namespace utils::webdav
 {
 
-pugi::xml_node generate_multistatus(pugi::xml_node& xml_doc, bool ssl_enabled, const std::string& host)
+pugi::xml_node generate_multistatus_header(pugi::xml_node& xml_doc)
 {
-    const std::string my = std::format("{}://{}", ssl_enabled ? "https" : "http", host);
-
     pugi::xml_node xml_ms = xml_doc.append_child("D:multistatus");
-    xml_ms.append_attribute("xmlns:D") = "DAV:";
-    xml_ms.append_attribute("xmlns:my") = my.c_str();
+    xml_ms.append_attribute("xmlns:D").set_value("DAV:");
 
     return xml_ms;
 }
@@ -91,7 +88,7 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std:
             auto xml_res = multistatus.append_child("D:response");
             std::string file_path = utils::path::with_separator(fs::relative(entry, std::filesystem::current_path()), 1, entry.is_directory(), '/');
             file_path.insert(file_path.begin(), '/');
-            xml_res.append_child("D:href").text().set(file_path.c_str());
+            xml_res.append_child("D:href").set_value(file_path.c_str());
 
             auto xml_propstat = xml_res.append_child("D:propstat");
             auto xml_prop = xml_propstat.append_child("D:prop");

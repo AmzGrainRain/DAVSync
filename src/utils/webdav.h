@@ -10,7 +10,7 @@ namespace utils::webdav
 {
 
 [[nodiscard]]
-pugi::xml_node generate_multistatus(pugi::xml_node& xml_doc, bool ssl_enabled, const std::string& host);
+pugi::xml_node generate_multistatus_header(pugi::xml_node& xml_doc);
 
 void generate_response_list(pugi::xml_node& multistatus, const std::filesystem::path& path);
 

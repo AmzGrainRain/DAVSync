@@ -50,3 +50,11 @@ class NotFoundException : public std::runtime_error
     {
     }
 };
+
+class MethodNotAllowedException : public std::runtime_error
+{
+  public:
+    explicit MethodNotAllowedException(const std::string& msg) : std::runtime_error(msg)
+    {
+    }
+};
