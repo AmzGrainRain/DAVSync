@@ -5,13 +5,17 @@
 #include <filesystem>
 #include <format>
 #include <mutex>
+#include <regex>
 #include <stack>
 #include <string>
 #include <utility>
 
 #include <PicoSHA2/picosha2.h>
 
+#include "http_exceptions.hpp"
 #include "path.h"
+#include "services/FileETagServiceFactory.h"
+#include "services/FileLockService.h"
 #include "utils/path.h"
 
 std::mutex utils_webdav_ComputeEtag_LOCK;
@@ -120,6 +124,83 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, const std::file
     std::stack<std::filesystem::path> stack;
     stack.push(path);
     generate_response_list_recurse(multistatus, std::move(stack), depth);
+}
+
+void check_precondition(const std::filesystem::path& abs_path, std::string conditions)
+{
+    static auto& lock_service = FileLock::Service::GetInstance();
+    static auto& etag_service = FileETagService::GetService();
+
+    // <resource-tag> (condition1) (condition2) ...
+    static const std::regex extract_resource_tag{R"(^\<(/[^\s]+/?)\> (.*)+)"};
+
+    /*
+        (<urn:uuid:lock-token>) -> <urn:uuid:lock-token>
+        ([sha256]) -> [sha256]
+        (Not <urn:uuid:lock-token>) -> Not <urn:uuid:lock-token>
+        (Not [sha256]) -> Not [sha256]
+        (Not <urn:uuid:lock-token> [sha256]) -> Not <urn:uuid:lock-token> [sha256]
+        (<urn:uuid:lock-token> Not [sha256]) -> <urn:uuid:lock-token> Not [sha256]
+        (Not <urn:uuid:lock-token> Not [sha256] -> Not <urn:uuid:lock-token> Not [sha256]
+    */
+    static const std::regex extract_condition{R"((Not )?(\<urn:uuid:[^\s]+\>|\[[A-Za-z0-9]{64}\]))"};
+
+    // [sha256]
+    static const std::regex is_entity_tag{R"(^\[(.*)\]$)"};
+
+    // <urn:uuid:lock-token>
+    static const std::regex is_state_token{R"(\<(.*)\>)"};
+
+    //-- try to extract Resource-Tag --//
+    // to which resource should the conditions be applied
+    std::string resource_path = abs_path.string();
+    {
+        std::smatch matched_result;
+        if (std::regex_search(conditions, matched_result, extract_resource_tag))
+        {
+            resource_path = matched_result[1].str();
+            conditions = matched_result[2].str();
+        }
+    }
+
+    //-- try to parse No-tag-list --//
+    std::sregex_iterator it{conditions.begin(), conditions.end(), extract_condition};
+    std::sregex_iterator end;
+    bool ok = false;
+
+    // check preconditions
+    while (it != end)
+    {
+        std::smatch mres = *it++;
+        bool not_flag = !(mres[1].str().empty());
+        std::string condition = mres[2].str();
+
+        // lock token
+        if (condition.starts_with('<') && condition.ends_with('>'))
+        {
+            bool res = lock_service.LockedByToken(resource_path, condition);
+            if (not_flag)
+                res = !res;
+            if (!res)
+                throw PreconditionFailedException("precondition failed");
+            ok = true;
+        }
+
+        if (condition.starts_with('[') && condition.ends_with(']'))
+        {
+            bool res = etag_service.Get(resource_path) == std::format("[{}]", condition);
+            if (not_flag)
+                res = !res;
+            if (!res)
+                throw PreconditionFailedException("precondition failed");
+            ok = true;
+        }
+    }
+
+    if (!ok)
+    {
+        throw PreconditionFailedException("precondition failed");
+    }
 }
 
 } // namespace utils::webdav

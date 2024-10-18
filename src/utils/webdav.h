@@ -18,4 +18,6 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std:
 
 void generate_response_list_recurse(pugi::xml_node& multistatus, const std::filesystem::path& path, int8_t depth);
 
+void check_precondition(const std::filesystem::path& abs_path, std::string conditions);
+
 } // namespace utils::webdav
