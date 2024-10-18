@@ -2,7 +2,6 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -12,19 +11,9 @@
 #include <pugixml.hpp>
 
 #include "ConfigReader.h"
+#include "http_exceptions.hpp"
+#include "logger.hpp"
 #include "services/FileETagServiceFactory.h"
-#include "utils/webdav.h"
-
-inline std::string GenerateMultiStatus(const std::filesystem::path& dir)
-{
-    const auto& conf = ConfigReader::GetInstance();
-    pugi::xml_document xml_doc;
-    utils::webdav::generate_multistatus(xml_doc, conf.GetHttpsEnabled(), conf.GetHttpHost());
-    utils::webdav::generate_response_list(xml_doc, dir);
-    std::ostringstream oss;
-    xml_doc.save(oss);
-    return oss.str();
-}
 
 inline async_simple::coro::Lazy<void> SendFile(cinatra::coro_http_response& res, const std::filesystem::path& path)
 {
@@ -64,47 +53,61 @@ void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
     namespace fs = std::filesystem;
     const auto& conf = ConfigReader::GetInstance();
 
-    fs::path abs_path = utils::webdav::uri_to_absolute(conf.GetWebDavAbsoluteDataPath(), conf.GetWebDavPrefix(), req.get_url());
-    if (!fs::exists(abs_path))
+    try
     {
+        fs::path abs_path = conf.GetWebDavAbsoluteDataPath(req.get_url());
+        if (!fs::exists(abs_path))
+        {
+            throw NotFoundException("File not found.");
+        }
+
+        if (fs::is_directory(abs_path))
+        {
+            throw BadRequestException("Directory not allowed.");
+        }
+
+        if (!fs::is_regular_file(abs_path))
+        {
+            throw BadRequestException("Not a regular file.");
+        }
+
+        auto& etag_service = FileETagService::GetService();
+        std::string etag = etag_service.Set(abs_path);
+        if (etag.empty())
+        {
+            throw std::runtime_error("Failed to compute ETag.");
+        }
+
+        //  There are ONLY TWO SITUATIONS where we need to respond to the client:
+        //  1. When the request header does not have "If-None-Match" property.
+        //  2. When the request header has "If-None-Match", and its value does
+        //     not match the ETag computed by the server.
+        const std::string_view& client_etag = req.get_header_value("If-None-Match");
+        if (client_etag.empty() || client_etag != etag)
+        {
+            res.add_header("ETag", etag);
+            async_simple::coro::syncAwait(SendFile(res, abs_path));
+            return;
+        }
+
+        // ETag matched
+        res.set_status(cinatra::status_type::not_modified);
+    }
+    catch (const NotFoundException& err)
+    {
+        LOG_ERROR(err.what())
         res.set_status(cinatra::status_type::not_found);
-        return;
     }
-
-    if (fs::is_directory(abs_path))
+    catch (const BadRequestException& err)
     {
+        LOG_ERROR(err.what())
         res.set_status(cinatra::status_type::bad_request);
-        return;
     }
-
-    if (!fs::is_regular_file(abs_path))
+    catch (const std::exception& err)
     {
+        LOG_ERROR(err.what())
         res.set_status(cinatra::status_type::internal_server_error);
-        return;
     }
-
-    auto& etag_service = FileETagService::GetService();
-    std::string etag = etag_service.Set(abs_path);
-    if (!etag.empty())
-    {
-        res.set_status(cinatra::status_type::internal_server_error);
-        return;
-    }
-
-    //  There are ONLY TWO SITUATIONS where we need to respond to the client:
-    //  1. When the request header does not have "If-None-Match" property.
-    //  2. When the request header has "If-None-Match", and its value does
-    //     not match the ETag computed by the server.
-    const std::string_view& client_etag = req.get_header_value("If-None-Match");
-    if (client_etag.empty() || client_etag != etag)
-    {
-        res.add_header("ETag", etag);
-        async_simple::coro::syncAwait(SendFile(res, abs_path));
-        return;
-    }
-
-    // ETag matched
-    res.set_status(cinatra::status_type::not_modified);
 }
 
 } // namespace Routes::WebDAV

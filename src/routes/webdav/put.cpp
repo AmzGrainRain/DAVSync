@@ -1,14 +1,17 @@
 #include "put.h"
+
 #include <exception>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <stdexcept>
 
 #include <cinatra/coro_http_connection.hpp>
 
 #include "ConfigReader.h"
-#include "utils/webdav.h"
+#include "http_exceptions.hpp"
+#include "logger.hpp"
+#include "services/FileETagServiceFactory.h"
+#include "services/FileLockService.h"
 
 namespace Routes::WebDAV
 {
@@ -18,29 +21,37 @@ async_simple::coro::Lazy<void> PUT(cinatra::coro_http_request& req, cinatra::cor
     namespace fs = std::filesystem;
     const auto& conf = ConfigReader::GetInstance();
 
-    std::filesystem::path abs_path = utils::webdav::uri_to_absolute(conf.GetWebDavAbsoluteDataPath(), conf.GetWebDavPrefix(), req.get_url());
-    if (fs::exists(abs_path))
+    try
     {
-        // TODO: LOCK
+        std::filesystem::path abs_path = conf.GetWebDavAbsoluteDataPath(req.get_url());
+        if (!fs::exists(abs_path))
+        {
+            throw NotFoundException("The specified file does not exist");
+        }
 
         if (fs::is_directory(abs_path))
         {
-            res.set_status(cinatra::status_type::conflict);
-            co_return;
+            throw ConflictException("The specified path is a directory");
         }
 
-        res.set_status(cinatra::status_type::method_not_allowed);
-        co_return;
-    }
+        if (req.get_content_type() != cinatra::content_type::chunked)
+        {
+            throw BadRequestException("Only chunked transfer encoding is allowed for this resource");
+        }
 
-    if (req.get_content_type() != cinatra::content_type::chunked)
-    {
-        res.set_status(cinatra::status_type::bad_request);
-        co_return;
-    }
+        static auto& lock_service = FileLock::Service::GetInstance();
+        const auto* lock_list = lock_service.GetAllLock(abs_path);
+        if (lock_list != nullptr)
+        {
+            for (const auto& lock : *lock_list)
+            {
+                if (lock.second->type == FileLock::LockType::WRITE || lock.second->scope == FileLock::LockScope::EXCLUSIVE)
+                {
+                    throw LockedException("The specified file is locked");
+                }
+            }
+        }
 
-    try
-    {
         std::ofstream ofs(abs_path);
         if (!ofs.is_open())
         {
@@ -62,14 +73,35 @@ async_simple::coro::Lazy<void> PUT(cinatra::coro_http_request& req, cinatra::cor
         ofs.flush();
         ofs.close();
 
-        // TODO: compute file SHA256 & save to postgresql
-
+        // update etag
+        static auto& etag_service = FileETagService::GetService();
+        etag_service.Set(abs_path);
 
         res.set_status(cinatra::status_type::ok);
     }
+    catch (const NotFoundException& err)
+    {
+        LOG_INFO(err.what())
+        res.set_status(cinatra::status_type::not_found);
+    }
+    catch (const ConflictException& err)
+    {
+        LOG_INFO(err.what())
+        res.set_status(cinatra::status_type::conflict);
+    }
+    catch (const BadRequestException& err)
+    {
+        LOG_INFO(err.what())
+        res.set_status(cinatra::status_type::bad_request);
+    }
+    catch (const LockedException& err)
+    {
+        LOG_INFO(err.what())
+        res.set_status(cinatra::status_type::locked);
+    }
     catch (const std::exception& err)
     {
-        std::cerr << err.what() << std::endl;
+        LOG_ERROR(err.what())
         res.set_status(cinatra::status_type::internal_server_error);
     }
 }
