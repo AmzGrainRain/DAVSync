@@ -71,6 +71,8 @@ class Service
 
     bool HoldingExclusiveLock(const fs::path& path);
 
+    bool LockedByToken(const fs::path& path, const std::string& token);
+
   private:
     struct Entry
     {

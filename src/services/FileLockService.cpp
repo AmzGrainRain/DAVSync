@@ -367,6 +367,25 @@ bool Service::HoldingExclusiveLock(const fs::path& path)
     return false;
 }
 
+bool Service::LockedByToken(const fs::path& path, const std::string& token)
+{
+    const auto* all_lock = GetAllLock(path);
+    if (all_lock == nullptr)
+    {
+        return false;
+    }
+
+    for (const auto& lock : *all_lock)
+    {
+        if (lock.second->token == token)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 Service::Service()
 {
     root_ = new Entry();
