@@ -15,6 +15,7 @@ if(WIN32)
 endif()
 
 # vcpkg
+find_package(Boost REQUIRED COMPONENTS uuid)
 find_package(hiredis CONFIG REQUIRED)
 
 # external

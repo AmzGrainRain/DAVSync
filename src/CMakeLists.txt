@@ -13,6 +13,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/external/ormpp/thirdparty/sqlite3
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE
+    Boost::uuid
     inih::static
     cinatra::headers
     ormpp::headers
