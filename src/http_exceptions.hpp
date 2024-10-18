@@ -34,3 +34,19 @@ class ConflictException : public std::runtime_error
     {
     }
 };
+
+class LockedException : public std::runtime_error
+{
+  public:
+    explicit LockedException(const std::string& msg) : std::runtime_error(msg)
+    {
+    }
+};
+
+class NotFoundException : public std::runtime_error
+{
+  public:
+    explicit NotFoundException(const std::string& msg) : std::runtime_error(msg)
+    {
+    }
+};
