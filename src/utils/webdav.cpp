@@ -10,13 +10,10 @@
 #include <string>
 #include <utility>
 
-#include <PicoSHA2/picosha2.h>
-
 #include "http_exceptions.hpp"
 #include "path.h"
 #include "services/FileETagServiceFactory.h"
 #include "services/FileLockService.h"
-#include "utils/path.h"
 
 std::mutex utils_webdav_ComputeEtag_LOCK;
 
@@ -33,11 +30,11 @@ pugi::xml_node generate_multistatus_header(pugi::xml_node& xml_doc)
 
 void generate_response(pugi::xml_node& multistatus, const std::filesystem::path& path)
 {
-    bool is_directory = std::filesystem::is_directory(path);
+    const bool is_directory = std::filesystem::is_directory(path);
     auto xml_res = multistatus.append_child("D:response");
 
     auto relative_file_path = std::filesystem::relative(path, std::filesystem::current_path());
-    std::string file_path = utils::path::with_separator(relative_file_path, 1, is_directory, '/');
+    std::string file_path = utils::path::with_separator(relative_file_path, is_directory, '/', 1);
     file_path.insert(file_path.begin(), '/'); // begin with '/'
 
     xml_res.append_child("D:href").text().set(file_path.c_str());
@@ -72,7 +69,8 @@ void generate_response_list(pugi::xml_node& multistatus, const std::filesystem::
     }
 }
 
-void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std::filesystem::path> dirs, int8_t depth)
+// NOLINTNEXTLINE
+void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std::filesystem::path> dirs, const int8_t depth)
 {
     namespace fs = std::filesystem;
 
@@ -86,7 +84,7 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std:
         for (const auto& entry : fs::directory_iterator(dirs.top()))
         {
             auto xml_res = multistatus.append_child("D:response");
-            std::string file_path = utils::path::with_separator(fs::relative(entry, std::filesystem::current_path()), 1, entry.is_directory(), '/');
+            std::string file_path = utils::path::with_separator(fs::relative(entry, std::filesystem::current_path()), entry.is_directory(), '/', 1);
             file_path.insert(file_path.begin(), '/');
             xml_res.append_child("D:href").set_value(file_path.c_str());
 
@@ -113,10 +111,10 @@ void generate_response_list_recurse(pugi::xml_node& multistatus, std::stack<std:
         dirs.pop();
     }
 
-    generate_response_list_recurse(multistatus, std::move(sub_dirs), depth - 1);
+    generate_response_list_recurse(multistatus, std::move(sub_dirs), static_cast<int8_t>(depth - 1));
 }
 
-void generate_response_list_recurse(pugi::xml_node& multistatus, const std::filesystem::path& path, int8_t depth)
+void generate_response_list_recurse(pugi::xml_node& multistatus, const std::filesystem::path& path, const int8_t depth)
 {
     std::stack<std::filesystem::path> stack;
     stack.push(path);
@@ -152,8 +150,7 @@ void check_precondition(const std::filesystem::path& abs_path, std::string condi
     // to which resource should the conditions be applied
     std::string resource_path = abs_path.string();
     {
-        std::smatch matched_result;
-        if (std::regex_search(conditions, matched_result, extract_resource_tag))
+        if (std::smatch matched_result; std::regex_search(conditions, matched_result, extract_resource_tag))
         {
             resource_path = matched_result[1].str();
             conditions = matched_result[2].str();

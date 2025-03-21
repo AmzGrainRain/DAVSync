@@ -17,7 +17,7 @@
 #include "utils/path.h"
 #include "utils/string.h"
 
-static inline void ParseHttpConfig(INIReader& ini, std::string& host, std::string& address, uint16_t& port, size_t& buffer_size, uint16_t& max_thread)
+inline void ParseHttpConfig(const INIReader& ini, std::string& host, std::string& address, uint16_t& port, size_t& buffer_size, uint16_t& max_thread)
 {
     // host
     host = ini.GetString("http", "host", "127.0.0.1");
@@ -46,12 +46,12 @@ static inline void ParseHttpConfig(INIReader& ini, std::string& host, std::strin
     }
 }
 
-static inline void ParseHttpsConfig(INIReader& ini, bool& enable, uint16_t& port, bool& only, std::filesystem::path& cert, std::filesystem::path& key)
+inline void ParseHttpsConfig(const INIReader& ini, bool& enable, uint16_t& port, bool& only, std::filesystem::path& cert, std::filesystem::path& key)
 {
     // https enable
     enable = ini.GetBoolean("https", "enable", "false");
     {
-        long https_port = ini.GetInteger("https", "port", 8111);
+        const long https_port = ini.GetInteger("https", "port", 8111);
         assert(std::in_range<uint16_t>(https_port) && "[https.port] Must be within the range of [0-65535]");
         port = static_cast<uint16_t>(https_port);
     }
@@ -72,7 +72,7 @@ static inline void ParseHttpsConfig(INIReader& ini, bool& enable, uint16_t& port
     }
 }
 
-static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::string& route_prefix, std::filesystem::path& absolute_data_path,
+inline void ParseWebDAVConfig(const INIReader& ini, std::string& prefix, std::string& route_prefix, std::filesystem::path& absolute_data_path,
                                      std::filesystem::path& relative_data_path, int8_t& max_recurse_depth, std::string& realm,
                                      std::string& verification, std::unordered_map<std::string, std::string>& users)
 {
@@ -125,7 +125,7 @@ static inline void ParseWebDAVConfig(INIReader& ini, std::string& prefix, std::s
     }
 }
 
-static inline void ParseRedisConfig(INIReader& ini, std::string& host, uint16_t& port, std::string& user, std::string& passwd)
+inline void ParseRedisConfig(const INIReader& ini, std::string& host, uint16_t& port, std::string& user, std::string& passwd)
 {
     // redis address
     host = ini.GetString("redis", "host", "localhost");
@@ -144,7 +144,7 @@ static inline void ParseRedisConfig(INIReader& ini, std::string& host, uint16_t&
     assert(!passwd.empty() && "[redis.password] Cannot be empty");
 }
 
-static inline void ParseEngineConfig(INIReader& ini, std::string& etag_engine, std::string& prop_engine)
+inline void ParseEngineConfig(const INIReader& ini, std::string& etag_engine, std::string& prop_engine)
 {
     std::unordered_set<std::string> engine_list{"memory", "sqlite", "redis"};
 
@@ -155,7 +155,7 @@ static inline void ParseEngineConfig(INIReader& ini, std::string& etag_engine, s
     assert(engine_list.contains(prop_engine) && "[engine.prop] Must be one of them [memory|sqlite|redis]");
 }
 
-static inline void ParseCacheConfig(INIReader& ini, std::filesystem::path& sqlite_db, std::filesystem::path& etag_data,
+inline void ParseCacheConfig(const INIReader& ini, std::filesystem::path& sqlite_db, std::filesystem::path& etag_data,
                                     std::filesystem::path& prop_data)
 {
     sqlite_db = ini.GetString("cache", "sqlite-db", "./data.db");
@@ -163,7 +163,7 @@ static inline void ParseCacheConfig(INIReader& ini, std::filesystem::path& sqlit
     prop_data = ini.GetString("cache", "prop-data", "./prop.dat");
 }
 
-inline const void ConfigReader::WriteDefaultConfigFile(const std::filesystem::path& file)
+void ConfigReader::WriteDefaultConfigFile(const std::filesystem::path& file)
 {
     LOG_WARN("unable to read configuration file, creating ...")
 
@@ -225,6 +225,7 @@ const ConfigReader& ConfigReader::GetInstance()
     return instance;
 }
 
+// NOLINTNEXTLINE
 ConfigReader::ConfigReader(const std::filesystem::path& path)
 {
     namespace fs = std::filesystem;
@@ -236,7 +237,7 @@ ConfigReader::ConfigReader(const std::filesystem::path& path)
         LOG_INFO("Default configuration has been generated, please restart the server.")
     }
 
-    INIReader reader(path_string);
+    const INIReader reader(path_string);
     assert(reader.ParseError() == 0 && "Failed to parsing settings.ini");
     cwd_ = fs::current_path();
 
@@ -271,7 +272,7 @@ const std::string& ConfigReader::GetHttpAddress() const noexcept
 
 uint16_t ConfigReader::GetHttpPort() const noexcept
 {
-    return static_cast<uint16_t>(http_port_);
+    return http_port_;
 }
 
 uint16_t ConfigReader::GetHttpMaxThread() const noexcept
@@ -352,9 +353,8 @@ std::filesystem::path ConfigReader::GetWebDavAbsoluteDataPath(std::string_view u
     res = res.lexically_normal();
     // Escape from resource directory?
     {
-        auto path = fs::relative(res, webdav_absolute_data_path_);
-        auto path_str = utils::path::to_string(path);
-        if (path_str.starts_with(".."))
+        const auto path = fs::relative(res, webdav_absolute_data_path_);
+        if (auto path_str = utils::path::to_string(path); path_str.starts_with(".."))
         {
             LOG_WARN_FMT("Discovery of escape behavior from resource directory!\nTo: {}", path_str);
             return {""};
@@ -397,7 +397,7 @@ const std::string& ConfigReader::GetRedisHost() const noexcept
 
 uint16_t ConfigReader::GetRedisPort() const noexcept
 {
-    return static_cast<uint16_t>(redis_port_);
+    return redis_port_;
 }
 
 const std::string& ConfigReader::GetRedisUserName() const noexcept

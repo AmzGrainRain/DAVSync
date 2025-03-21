@@ -7,11 +7,11 @@ std::string pairs_stringify(const std::vector<std::pair<std::string, std::string
                             const std::string_view& kv_separator, const std::string_view& separator)
 {
     std::string result{};
-    for (const auto& pair : pairs)
+    for (const auto& [k, v] : pairs)
     {
-        result += pair.first;
+        result += k;
         result += kv_separator;
-        result += pair.second;
+        result += v;
         result += separator;
     }
 

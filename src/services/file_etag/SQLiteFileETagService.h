@@ -7,7 +7,7 @@
 namespace FileETagService
 {
 
-class SQLiteFileETagService : public FileETagService
+class SQLiteFileETagService final : public FileETagService
 {
   public:
     SQLiteFileETagService();

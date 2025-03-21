@@ -8,11 +8,11 @@
 
 #include "utils.h"
 
-constexpr const char* MAP = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+constexpr auto MAP = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                             "abcdefghijklmnopqrstuvwxyz"
                             "0123456789+/";
 
-constexpr const char* MAP_URL_ENCODED = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+constexpr auto MAP_URL_ENCODED = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                         "abcdefghijklmnopqrstuvwxyz"
                                         "0123456789-_";
 
@@ -68,10 +68,12 @@ std::string base64_decode(const std::string& src, bool url_encoded)
     decoded.reserve(src.size() * 3 / 4);
 
     size_t padding = 0;
-    auto it = src.end();
-    while (it != src.begin() && (*--it == '=' || *it == '\0'))
     {
-        ++padding;
+        auto it = src.end();
+        while (it != src.begin() && (*--it == '=' || *it == '\0'))
+        {
+            ++padding;
+        }
     }
     if (padding > 2)
     {

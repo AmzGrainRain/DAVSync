@@ -1,6 +1,5 @@
 #pragma once
 
-#include <ctime>
 #include <filesystem>
 
 namespace utils::file {

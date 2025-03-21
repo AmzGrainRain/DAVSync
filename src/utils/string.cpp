@@ -1,4 +1,4 @@
-#include "string.h"
+#include "./string.h"
 #include <string_view>
 
 namespace utils::string
@@ -79,7 +79,7 @@ std::vector<std::string> split(const std::string_view& str, const char separator
     return tokens;
 }
 
-auto split2pair(const std::string& str, char separator) -> std::pair<std::string, std::string>
+auto split2pair(const std::string& str, const char separator) -> std::pair<std::string, std::string>
 {
     size_t pos = str.find(separator);
     if (pos == std::string::npos)
@@ -92,7 +92,7 @@ auto split2pair(const std::string& str, char separator) -> std::pair<std::string
     return std::pair{std::string(k), std::string(v)};
 }
 
-auto split2pair(const std::string_view& str, char separator) -> std::pair<std::string, std::string>
+auto split2pair(const std::string_view& str, const char separator) -> std::pair<std::string, std::string>
 {
     size_t pos = str.find(separator);
     if (pos == std::string_view::npos)

@@ -11,14 +11,11 @@
 namespace FileETagService
 {
 
-REFLECTION(FileETagTable, path, sha)
-
 SQLiteFileETagService::SQLiteFileETagService()
 {
     using namespace ormpp;
-    const auto& conf = ConfigReader::GetInstance();
 
-    if (!dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "ETag"))
+    if (const auto& conf = ConfigReader::GetInstance(); !dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "ETag"))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }

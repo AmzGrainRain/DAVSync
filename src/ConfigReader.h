@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
@@ -9,48 +8,48 @@
 class ConfigReader
 {
   public:
-    ConfigReader(const std::filesystem::path& path = std::filesystem::current_path() / "settings.ini");
+    explicit ConfigReader(const std::filesystem::path& path = std::filesystem::current_path() / "settings.ini");
 
     static const ConfigReader& GetInstance();
 
-    inline const void WriteDefaultConfigFile(const std::filesystem::path& file);
+    static void WriteDefaultConfigFile(const std::filesystem::path& file);
 
-    const std::filesystem::path& GetCWD() const noexcept;
+    [[nodiscard]] const std::filesystem::path& GetCWD() const noexcept;
 
-    const std::string& GetHttpHost() const noexcept;
-    const std::string& GetHttpAddress() const noexcept;
-    uint16_t GetHttpPort() const noexcept;
-    uint16_t GetHttpMaxThread() const noexcept;
-    size_t GetHttpBufferSize() const noexcept;
+    [[nodiscard]] const std::string& GetHttpHost() const noexcept;
+    [[nodiscard]] const std::string& GetHttpAddress() const noexcept;
+    [[nodiscard]] uint16_t GetHttpPort() const noexcept;
+    [[nodiscard]] uint16_t GetHttpMaxThread() const noexcept;
+    [[nodiscard]] size_t GetHttpBufferSize() const noexcept;
 
-    bool GetHttpsEnabled() const noexcept;
-    uint16_t GetHttpsPort() const noexcept;
-    bool GetHttpsOnly() const noexcept;
-    const std::filesystem::path& GetSSLCertPath() const noexcept;
-    const std::filesystem::path& GetSSLKeyPath() const noexcept;
+    [[nodiscard]] bool GetHttpsEnabled() const noexcept;
+    [[nodiscard]] uint16_t GetHttpsPort() const noexcept;
+    [[nodiscard]] bool GetHttpsOnly() const noexcept;
+    [[nodiscard]] const std::filesystem::path& GetSSLCertPath() const noexcept;
+    [[nodiscard]] const std::filesystem::path& GetSSLKeyPath() const noexcept;
 
-    const std::string& GetWebDavPrefix() const noexcept;
-    const std::string& GetWebDavRoutePrefix() const noexcept;
-    const std::filesystem::path& GetWebDavRelativeDataPath() const noexcept;
-    std::filesystem::path GetWebDavRelativeDataPath(std::string_view url) const noexcept;
-    const std::filesystem::path& GetWebDavAbsoluteDataPath() const noexcept;
-    std::filesystem::path GetWebDavAbsoluteDataPath(std::string_view url) const noexcept;
-    int8_t GetWebDavMaxRecurseDepth() const noexcept;
-    const std::string& GetWebDavRealm() const noexcept;
-    const std::string& GetWebDavVerification() const noexcept;
-    std::string GetWebDavUser(const std::string& user) const noexcept;
+    [[nodiscard]] const std::string& GetWebDavPrefix() const noexcept;
+    [[nodiscard]] const std::string& GetWebDavRoutePrefix() const noexcept;
+    [[nodiscard]] const std::filesystem::path& GetWebDavRelativeDataPath() const noexcept;
+    [[nodiscard]] std::filesystem::path GetWebDavRelativeDataPath(std::string_view url) const noexcept;
+    [[nodiscard]] const std::filesystem::path& GetWebDavAbsoluteDataPath() const noexcept;
+    [[nodiscard]] std::filesystem::path GetWebDavAbsoluteDataPath(std::string_view url) const noexcept;
+    [[nodiscard]] int8_t GetWebDavMaxRecurseDepth() const noexcept;
+    [[nodiscard]] const std::string& GetWebDavRealm() const noexcept;
+    [[nodiscard]] const std::string& GetWebDavVerification() const noexcept;
+    [[nodiscard]] std::string GetWebDavUser(const std::string& user) const noexcept;
 
-    const std::string& GetRedisHost() const noexcept;
-    uint16_t GetRedisPort() const noexcept;
-    const std::string& GetRedisUserName() const noexcept;
-    const std::string& GetRedisPassword() const noexcept;
+    [[nodiscard]] const std::string& GetRedisHost() const noexcept;
+    [[nodiscard]] uint16_t GetRedisPort() const noexcept;
+    [[nodiscard]] const std::string& GetRedisUserName() const noexcept;
+    [[nodiscard]] const std::string& GetRedisPassword() const noexcept;
 
-    const std::string& GetETagEngine() const noexcept;
-    const std::string& GetPropEngine() const noexcept;
+    [[nodiscard]] const std::string& GetETagEngine() const noexcept;
+    [[nodiscard]] const std::string& GetPropEngine() const noexcept;
 
-    const std::filesystem::path& GetSQLiteDB() const noexcept;
-    const std::filesystem::path& GetETagData() const noexcept;
-    const std::filesystem::path& GetPropData() const noexcept;
+    [[nodiscard]] const std::filesystem::path& GetSQLiteDB() const noexcept;
+    [[nodiscard]] const std::filesystem::path& GetETagData() const noexcept;
+    [[nodiscard]] const std::filesystem::path& GetPropData() const noexcept;
 
   private:
     std::filesystem::path cwd_;

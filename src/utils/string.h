@@ -13,9 +13,9 @@ void replace(std::string& str, const std::string& search, const std::string& rep
 void trim(std::string& str);
 
 // split("hello,world", ",") -> std::vector{"hello", "world"}
-std::vector<std::string> split(const std::string& str, const char separator);
+std::vector<std::string> split(const std::string& str, char separator);
 
-std::vector<std::string> split(const std::string_view& str, const char separator);
+std::vector<std::string> split(const std::string_view& str, char separator);
 
 // split2pair("name=Lee", "=") -> std::pair<std::string, std::string>("name", "Lee")
 [[nodiscard]]

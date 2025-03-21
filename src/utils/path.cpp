@@ -12,7 +12,7 @@ std::string to_string(const std::filesystem::path& path) noexcept
     return std::string{u8str.begin(), u8str.end()};
 }
 
-std::string with_separator(const std::filesystem::path& path, bool is_dir, char separator, uint16_t skip) noexcept
+std::string with_separator(const std::filesystem::path& path, const bool is_dir, const char separator, uint16_t skip) noexcept
 {
 
     auto it = path.begin();
@@ -29,12 +29,12 @@ std::string with_separator(const std::filesystem::path& path, bool is_dir, char 
     }
 
     // concat
-    std::u8string u8str = (*it).u8string();
+    std::u8string u8str = it->u8string();
     std::string ret{u8str.begin(), u8str.end()};
     // the default value of u8str has already used it, so here ++it
     for (++it; it != path.end(); ++it)
     {
-        u8str = (*it).u8string();
+        u8str = it->u8string();
         ret += separator;
         ret += {u8str.begin(), u8str.end()};
     }

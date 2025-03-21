@@ -43,7 +43,7 @@ auto RedisExecute(redisContext* ctx, const std::string& command) noexcept -> Red
 bool RedisAuth(redisContext* ctx, const std::string& user, const std::string& password) noexcept
 {
     const std::string auth_str = std::format("AUTH {} {}", user, password);
-    RedisReplyT repl = RedisExecute(ctx, auth_str.data());
+    const RedisReplyT repl = RedisExecute(ctx, auth_str);
     if (!repl)
     {
         return false;

@@ -1,9 +1,12 @@
 .cache
 .vs
 .vscode
+.idea
 build
 out
 external/cinatra
 external/inih
 external/PicoSHA2
 external/pugixml
+external/ormpp
+cmake-build-*

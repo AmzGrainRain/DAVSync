@@ -12,17 +12,17 @@
 #include "utils/map.hpp"
 #include "utils/string.h"
 
-inline static void RequestVerification(cinatra::coro_http_response& res) noexcept
+inline void RequestVerification(cinatra::coro_http_response& res) noexcept
 {
     const auto& conf = ConfigReader::GetInstance();
 
-    const std::string header_content = std::format("Digest realm=\"{}\", qio=\"auth\", nonce=\"{}\", opaque=\"{}\", algorithm=\"SHA-256\"",
+    const std::string header_content = std::format(R"(Digest realm="{}", qio="auth", nonce="{}", opaque="{}", algorithm="SHA-256")",
                                                    conf.GetWebDavRealm(), utils::generate_unique_key(), utils::generate_unique_key());
     res.add_header("WWW-Authenticate", header_content);
     res.set_status(cinatra::status_type::unauthorized);
 }
 
-inline static auto ParseAuthorizationHeader(const std::string_view& text_view) noexcept -> std::unordered_map<std::string, std::string>
+inline auto ParseAuthorizationHeader(const std::string_view& text_view) noexcept -> std::unordered_map<std::string, std::string>
 {
     std::unordered_map<std::string, std::string> map{};
     std::string text{text_view};
@@ -30,8 +30,7 @@ inline static auto ParseAuthorizationHeader(const std::string_view& text_view) n
 
     for (const auto& kv_str : utils::string::split(text, ','))
     {
-        auto pair = utils::string::split2pair(kv_str, '=');
-        if (!pair.first.empty())
+        if (auto pair = utils::string::split2pair(kv_str, '='); !pair.first.empty())
         {
             map.insert(std::move(pair));
         }
@@ -40,7 +39,7 @@ inline static auto ParseAuthorizationHeader(const std::string_view& text_view) n
     return map;
 }
 
-inline static std::string ComputeHA1(const std::string& username) noexcept
+inline std::string ComputeHA1(const std::string& username) noexcept
 {
     const auto& conf = ConfigReader::GetInstance();
     const std::string password = conf.GetWebDavUser(username);
@@ -53,7 +52,7 @@ inline static std::string ComputeHA1(const std::string& username) noexcept
     return utils::sha256(std::format("{}:{}:{}", username, conf.GetWebDavRealm(), password));
 }
 
-inline static std::string ComputeHA2(const std::string_view& method, const std::string_view& uri) noexcept
+inline std::string ComputeHA2(const std::string_view& method, const std::string_view& uri) noexcept
 {
     // method:uri
     return utils::sha256(std::format("{}:{}", method, uri));
@@ -62,6 +61,7 @@ inline static std::string ComputeHA2(const std::string_view& method, const std::
 namespace Section
 {
 
+// NOLINTNEXTLINE
 bool DigestAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     try
@@ -86,11 +86,11 @@ bool DigestAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_resp
             return false;
         }
 
-        auto username = map.find("username");
-        auto nonce = map.find("nonce");
-        auto nc = map.find("nc");
-        auto conce = map.find("conce");
-        auto qop = map.find("qop");
+        const auto username = map.find("username");
+        const auto nonce = map.find("nonce");
+        const auto nc = map.find("nc");
+        const auto conce = map.find("conce");
+        const auto qop = map.find("qop");
 
         const std::string HA1 = ComputeHA1(username->second);
         if (HA1.empty())
@@ -102,8 +102,9 @@ bool DigestAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_resp
         const std::string HA2 = ComputeHA2(req.get_method(), req.get_url());
 
         // HA1:nonce:nc:conce:qop:HA2
-        const std::string RESPONSE = utils::sha256(std::format("{}:{}:{}:{}:{}:{}", HA1, nonce->second, nc->second, conce->second, qop->second, HA2));
-        if (map.find("response")->second != RESPONSE)
+        if (const std::string RESPONSE =
+                utils::sha256(std::format("{}:{}:{}:{}:{}:{}", HA1, nonce->second, nc->second, conce->second, qop->second, HA2));
+            map.find("response")->second != RESPONSE)
         {
             RequestVerification(res);
             return false;
@@ -122,6 +123,7 @@ bool DigestAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_resp
     }
 }
 
+// NOLINTNEXTLINE
 bool DigestAuth::after(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     return true;

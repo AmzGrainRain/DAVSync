@@ -1,11 +1,8 @@
 #include <exception>
+#include <stdexcept>
 #include <locale>
 
-#include <cinatra/coro_http_request.hpp>
-#include <cinatra/coro_http_response.hpp>
 #include <cinatra/coro_http_server.hpp>
-#include <pugixml.hpp>
-#include <stdexcept>
 
 #include "section/BasicAuth.h"
 #include "section/DigestAuth.h"
@@ -27,7 +24,6 @@
 #include "ConfigReader.h"
 #include "logger.hpp"
 #include "section/RequireXMLBody.h"
-
 
 int main()
 {

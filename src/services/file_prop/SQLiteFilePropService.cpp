@@ -16,14 +16,12 @@ namespace FilePropService
 {
 
 REGISTER_AUTO_KEY(FilePropTable, id)
-REFLECTION(FilePropTable, path, key, value, id)
 
 SQLiteFilePropService::SQLiteFilePropService() noexcept(false)
 {
     using namespace ormpp;
-    const auto& conf = ConfigReader::GetInstance();
 
-    if (!dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "FileProp"))
+    if (const auto& conf = ConfigReader::GetInstance(); !dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "FileProp"))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }
@@ -58,10 +56,9 @@ std::vector<PropT> SQLiteFilePropService::GetAll(const std::filesystem::path& pa
     const std::string path_str = utils::path::to_string(path);
     std::vector<PropT> props;
 
-    const auto query_res = dbng_.query_s<FilePropTable>(std::format("path='{}'", path_str));
-    for (const auto& prop : query_res)
+    for (const auto query_res = dbng_.query_s<FilePropTable>(std::format("path='{}'", path_str)); const auto& prop : query_res)
     {
-        props.push_back({prop.key, prop.value});
+        props.emplace_back(prop.key, prop.value);
     }
 
     return props;
