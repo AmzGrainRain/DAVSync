@@ -7,13 +7,12 @@
 struct Student
 {
     std::string name;
-    char sex;
-    int age;
+    char sex{};
+    int age{};
     std::string classroom;
-    int id;
+    int id{};
 };
 REGISTER_AUTO_KEY(Student, id)
-REFLECTION(Student, name, sex, age, classroom, id)
 
 int main()
 {

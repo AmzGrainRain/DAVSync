@@ -13,3 +13,6 @@
 [submodule "external/ormpp"]
 	path = external/ormpp
 	url = https://github.com/qicosmos/ormpp.git
+[submodule "external/iguana"]
+	path = external/iguana
+	url = https://github.com/qicosmos/iguana.git

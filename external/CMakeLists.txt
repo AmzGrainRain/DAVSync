@@ -1,5 +1,6 @@
 include(inih.cmake)
 include(cinatra.cmake)
+include(iguana.cmake)
 include(ormpp.cmake)
 include(pugixml.cmake)
 include(picosha2.cmake)

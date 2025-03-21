@@ -15,4 +15,4 @@ add_executable(test_xml test_xml.cpp)
 target_link_libraries(test_xml PUBLIC pugixml::static)
 
 add_executable(test_json test_json.cpp)
-add_test(test_json COMMAND test_json)
+target_link_libraries(test_json PUBLIC iguana::headers)

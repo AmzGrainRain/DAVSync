@@ -1,0 +1,41 @@
+{
+    "http": {
+        "host": "127.0.0.1",
+        "address": "0.0.0.0",
+        "port": 8110,
+        "buffer_size": 1024,
+        "max_thread": 0
+    },
+    "https": {
+        "enable": false,
+        "port": 8111,
+        "https_only": true,
+        "cert": "./full_chain.pem",
+        "key": "./key.pem"
+    },
+    "webdav": {
+        "prefix": "/webdav",
+        "data_path": "./data",
+        "max_recurse_depth": 4,
+        "realm": "WebDavRealm",
+        "verification": "basic",
+        "users": [
+            {"name": "test", "password": "admin"}
+        ]
+    },
+    "redis": {
+        "host": "localhost",
+        "port": 6379,
+        "username": "default",
+        "password": ""
+    },
+    "engine": {
+        "etag": "sqlite",
+        "prop": "sqlite"
+    },
+    "data": {
+        "sqlite_db": "./metadata/data.db",
+        "etag_data": "./metadata/etag.dat",
+        "prop_data": "./metadata/prop.dat"
+    }
+}
