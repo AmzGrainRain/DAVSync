@@ -6,7 +6,7 @@
 
 #include <hiredis/hiredis.h>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "logger.hpp"
 #include "utils.h"
 #include "utils/path.h"
@@ -19,7 +19,7 @@ namespace FileETagService
 
 RedisFileETagService::RedisFileETagService() : redis_ctx_(nullptr, &redisFree)
 {
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     redis_ctx_ = GetRedisContext(conf.GetRedisHost(), conf.GetRedisPort());
     if (redis_ctx_->err)

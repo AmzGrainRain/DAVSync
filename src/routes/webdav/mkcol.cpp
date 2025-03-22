@@ -2,7 +2,7 @@
 #include <exception>
 #include <filesystem>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "http_exceptions.hpp"
 #include "logger.hpp"
 
@@ -12,7 +12,7 @@ namespace Routes::WebDAV
 void MKCOL(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     try
     {

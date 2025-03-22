@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "logger.hpp"
 #include "utils/path.h"
 #include "utils/string.h"
@@ -19,7 +19,7 @@ namespace FilePropService
 
 MemoryFilePropService::MemoryFilePropService() noexcept(false)
 {
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
     const auto& data_path = conf.GetPropData();
     const std::string data_path_str = utils::path::to_string(data_path);
 
@@ -119,7 +119,7 @@ MemoryFilePropService::~MemoryFilePropService() noexcept
         data_ << std::endl;
     }
 
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
     LOG_ERROR_FMT("The file attributes have been saved to {}", utils::path::to_string(conf.GetPropData()));
 }
 

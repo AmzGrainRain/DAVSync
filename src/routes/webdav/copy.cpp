@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string_view>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "http_exceptions.hpp"
 #include "logger.hpp"
 #include "services/FileLockService.h"
@@ -26,7 +26,7 @@ namespace Routes::WebDAV
 void COPY(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     try
     {

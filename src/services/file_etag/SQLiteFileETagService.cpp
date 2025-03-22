@@ -2,11 +2,10 @@
 
 #include <format>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "logger.hpp"
 #include "utils.h"
 #include "utils/path.h"
-
 
 namespace FileETagService
 {
@@ -15,7 +14,7 @@ SQLiteFileETagService::SQLiteFileETagService()
 {
     using namespace ormpp;
 
-    if (const auto& conf = ConfigReader::GetInstance(); !dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "ETag"))
+    if (const auto& conf = ConfigManager::GetInstance(); !dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "ETag"))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }

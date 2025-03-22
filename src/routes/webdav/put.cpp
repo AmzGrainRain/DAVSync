@@ -7,7 +7,7 @@
 
 #include <cinatra/coro_http_connection.hpp>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "http_exceptions.hpp"
 #include "logger.hpp"
 #include "services/FileETagServiceFactory.h"
@@ -19,7 +19,7 @@ namespace Routes::WebDAV
 async_simple::coro::Lazy<void> PUT(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     try
     {

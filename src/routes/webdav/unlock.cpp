@@ -1,6 +1,6 @@
 #include "unlock.h"
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "http_exceptions.hpp"
 #include "logger.hpp"
 #include "services/FileLockService.h"
@@ -11,7 +11,7 @@ namespace Routes::WebDAV
 void UNLOCK(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
-    static const auto& conf = ConfigReader::GetInstance();
+    static const auto& conf = ConfigManager::GetInstance();
     const std::string username = req.get_aspect_data()[0];
 
     try

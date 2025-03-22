@@ -5,14 +5,14 @@
 #include "file_etag/MemoryFileETagService.h"
 #include "file_etag/RedisFileETagService.h"
 #include "file_etag/SQLiteFileETagService.h"
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 
 namespace FileETagService
 {
 
 FileETagService& GetService()
 {
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
     auto engine = conf.GetETagEngine();
 
     if (engine == "memory")

@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "logger.hpp"
 #include "utils.h"
 #include "utils/map.hpp"
@@ -14,7 +14,7 @@
 
 inline void RequestVerification(cinatra::coro_http_response& res) noexcept
 {
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     const std::string header_content = std::format(R"(Digest realm="{}", qio="auth", nonce="{}", opaque="{}", algorithm="SHA-256")",
                                                    conf.GetWebDavRealm(), utils::generate_unique_key(), utils::generate_unique_key());
@@ -41,15 +41,16 @@ inline auto ParseAuthorizationHeader(const std::string_view& text_view) noexcept
 
 inline std::string ComputeHA1(const std::string& username) noexcept
 {
-    const auto& conf = ConfigReader::GetInstance();
-    const std::string password = conf.GetWebDavUser(username);
-    if (password.empty())
+    const auto& conf = ConfigManager::GetInstance();
+    const auto user = conf.GetWebDavUser(username);
+
+    if (!user.has_value())
     {
         return {""};
     }
 
     // username:realm:password
-    return utils::sha256(std::format("{}:{}:{}", username, conf.GetWebDavRealm(), password));
+    return utils::sha256(std::format("{}:{}:{}", username, conf.GetWebDavRealm(), user->password));
 }
 
 inline std::string ComputeHA2(const std::string_view& method, const std::string_view& uri) noexcept

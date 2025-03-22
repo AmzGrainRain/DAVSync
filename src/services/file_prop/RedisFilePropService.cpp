@@ -12,7 +12,7 @@
 
 #include <hiredis/hiredis.h>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "utils/path.h"
 
 using namespace utils::redis;
@@ -22,7 +22,7 @@ namespace FilePropService
 
 RedisFilePropService::RedisFilePropService() noexcept(false) : redis_ctx_(nullptr, &redisFree)
 {
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     redis_ctx_ = GetRedisContext(conf.GetRedisHost(), conf.GetRedisPort());
     if (redis_ctx_->err)

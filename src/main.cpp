@@ -21,7 +21,7 @@
 #include "routes/webdav/put.h"
 #include "routes/webdav/unlock.h"
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "logger.hpp"
 #include "section/RequireXMLBody.h"
 
@@ -35,7 +35,7 @@ int main()
 
     try
     {
-        const ConfigReader& conf = ConfigReader::GetInstance();
+        const auto& conf = ConfigManager::GetInstance();
         coro_http_server app{conf.GetHttpMaxThread(), conf.GetHttpPort(), conf.GetHttpAddress()};
         const std::string& verify = conf.GetWebDavVerification();
         const std::string& webdav_prefix = conf.GetWebDavRoutePrefix();

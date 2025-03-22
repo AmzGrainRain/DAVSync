@@ -15,7 +15,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <pugixml.hpp>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "http_exceptions.hpp"
 #include "logger.hpp"
 #include "services/FileLockService.h"
@@ -100,7 +100,7 @@ void LOCK(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 
     try
     {
-        static const auto& conf = ConfigReader::GetInstance();
+        static const auto& conf = ConfigManager::GetInstance();
         static auto& lock_service = FileLock::Service::GetInstance();
         const std::string& username = req.get_aspect_data()[0];
 

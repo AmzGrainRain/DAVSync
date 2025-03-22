@@ -10,7 +10,7 @@
 #include <cinatra/coro_http_connection.hpp>
 #include <pugixml.hpp>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "http_exceptions.hpp"
 #include "logger.hpp"
 #include "services/FileETagServiceFactory.h"
@@ -28,7 +28,7 @@ inline async_simple::coro::Lazy<void> SendFile(cinatra::coro_http_response& res,
         co_return;
     }
 
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
     const size_t BUFFER_SIZE = conf.GetHttpBufferSize();
     std::vector<char> buffer(BUFFER_SIZE);
     size_t readed = 0;
@@ -51,7 +51,7 @@ namespace Routes::WebDAV
 void GET(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     try
     {

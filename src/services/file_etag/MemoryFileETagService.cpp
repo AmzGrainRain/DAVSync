@@ -8,7 +8,7 @@
 #include <string_view>
 #include <utility>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "logger.hpp"
 #include "utils.h"
 #include "utils/path.h"
@@ -18,7 +18,7 @@ namespace FileETagService
 
 MemoryFileETagService::MemoryFileETagService()
 {
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
     const auto& data_path = conf.GetETagData();
     const std::string data_path_str = utils::path::to_string(data_path);
 
@@ -71,7 +71,7 @@ MemoryFileETagService::~MemoryFileETagService()
         data_ << utils::path::to_string(path_sha) << ',' << etag << std::endl;
     }
 
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
     LOG_INFO_FMT("The file etag have been saved to {}", utils::path::to_string(conf.GetETagData()))
 }
 

@@ -1,6 +1,6 @@
 #include "FilePropServiceFactory.h"
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "file_prop/MemoryFilePropService.h"
 #include "file_prop/RedisFilePropService.h"
 #include "file_prop/SQLiteFilePropService.h"
@@ -12,7 +12,7 @@ namespace FilePropService
 
 FilePropService& GetService()
 {
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     if (conf.GetPropEngine() == "memory")
     {

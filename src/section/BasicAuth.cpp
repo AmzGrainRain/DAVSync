@@ -5,14 +5,14 @@
 #include <utility>
 #include <vector>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "logger.hpp"
 #include "utils.h"
 #include "utils/string.h"
 
 inline void RequestVerification(cinatra::coro_http_response& res) noexcept
 {
-    const auto& conf = ConfigReader::GetInstance();
+    const auto& conf = ConfigManager::GetInstance();
 
     const std::string header_content = std::format("Basic realm=\"{}\"", conf.GetWebDavRealm());
     res.add_header("WWW-Authenticate", header_content);
@@ -48,14 +48,22 @@ bool BasicAuth::before(cinatra::coro_http_request& req, cinatra::coro_http_respo
             return false;
         }
 
-        const auto& conf = ConfigReader::GetInstance();
+        const auto& conf = ConfigManager::GetInstance();
         const auto& [user, user_credit] = ParseAuthorization(authorization);
-        if (const std::string serverside_user_credit = conf.GetWebDavUser(user);
-            serverside_user_credit.empty() || user_credit != serverside_user_credit)
+        const auto serverside_user_credit_opt = conf.GetWebDavUser(user);
+        if (!serverside_user_credit_opt.has_value())
         {
             RequestVerification(res);
             return false;
         }
+
+        const auto serverside_user = serverside_user_credit_opt.value();
+        // TODO: check user_credit
+        // if (user_credit != serverside_user.)
+        // {
+        //     RequestVerification(res);
+        //     return false;
+        // }
 
         // save username, which plays an important role in the future
         req.set_aspect_data(user);

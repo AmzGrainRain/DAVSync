@@ -1,347 +1,332 @@
+#include "ConfigManager.h"
 #include <cassert>
-#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <string>
-#include <thread>
-#include <unordered_map>
 #include <unordered_set>
-#include <utility>
 
-#include <inih/cpp/INIReader.h>
+#include "iguana/json_reader.hpp"
+#include "iguana/json_writer.hpp"
 
-#include "ConfigReader.h"
-#include "logger.hpp"
-#include "utils/path.h"
-#include "utils/string.h"
-
-inline void ParseHttpConfig(const INIReader& ini, std::string& host, std::string& address, uint16_t& port, size_t& buffer_size, uint16_t& max_thread)
+const ConfigManager& ConfigManager::GetInstance(const std::filesystem::path& path, bool new_instance)
 {
-    // host
-    host = ini.GetString("http", "host", "127.0.0.1");
-    assert(!host.empty() && "[http.host] Illegal host");
+    static ConfigManager instance{path};
 
-    // address
-    address = ini.GetString("http", "address", "0.0.0.0");
-    assert(!address.empty() && "[http.address] Illegal address");
-
-    // port
-    long _http_port = ini.GetInteger("http", "port", 8110);
-    assert(std::in_range<uint16_t>(_http_port) && "[http.port] Must be within the range of [0-65535]");
-    port = static_cast<uint16_t>(_http_port);
-
-    // buffer size
-    buffer_size = static_cast<size_t>(ini.GetUnsigned64("http", "buffer-size", 1024));
-    assert((buffer_size >= 1024) && "[http.buffer-size] Must be >= 1024");
-
-    // thread number
-    long _max_thread = ini.GetInteger("http", "max_thread", 0);
-    assert(std::in_range<uint16_t>(_max_thread) && "[http.max-thread] Must be within the range of [0-65535]");
-    max_thread = static_cast<uint16_t>(_max_thread);
-    if (max_thread == 0)
-    {
-        max_thread = std::thread::hardware_concurrency();
-    }
-}
-
-inline void ParseHttpsConfig(const INIReader& ini, bool& enable, uint16_t& port, bool& only, std::filesystem::path& cert, std::filesystem::path& key)
-{
-    // https enable
-    enable = ini.GetBoolean("https", "enable", "false");
-    {
-        const long https_port = ini.GetInteger("https", "port", 8111);
-        assert(std::in_range<uint16_t>(https_port) && "[https.port] Must be within the range of [0-65535]");
-        port = static_cast<uint16_t>(https_port);
+    if (new_instance) {
+        instance.SaveConfig();
+        instance = ConfigManager{path};
     }
 
-    // https only
-    only = ini.GetBoolean("https", "https-only", true);
-
-    // https cert
-    cert = ini.GetString("ssl", "cert", "");
-
-    // https key
-    key = ini.GetString("ssl", "key", "");
-
-    if (enable)
-    {
-        assert(std::filesystem::is_regular_file(cert) && "[ssl.cert] Not exist");
-        assert(std::filesystem::is_regular_file(key) && "[ssl.key] Not exist");
-    }
-}
-
-inline void ParseWebDAVConfig(const INIReader& ini, std::string& prefix, std::string& route_prefix, std::filesystem::path& absolute_data_path,
-                                     std::filesystem::path& relative_data_path, int8_t& max_recurse_depth, std::string& realm,
-                                     std::string& verification, std::unordered_map<std::string, std::string>& users)
-{
-    // webdav prefix
-    prefix = ini.GetString("webdav", "prefix", "/webdav");
-    assert(!prefix.empty() && "[webdav.prefix] Cannot be empty");
-    {
-        char c = prefix.back();
-        assert((c >= 65 && c <= 90) || (c >= 97 && c <= 122) && "[webdav.prefix] Must end with the [a-Z] character");
-    }
-
-    // webdav route prefix
-    route_prefix = prefix + "/(.*)";
-
-    // webdav data path
-    const auto& cwd = std::filesystem::current_path();
-    std::filesystem::path _data_path = ini.GetString("webdav", "data-path", "data");
-    assert(std::filesystem::exists(_data_path) && "[webdav.data-path] Not exist");
-    assert(std::filesystem::is_directory(_data_path) && "[webdav.data-path] Required directory");
-    if (_data_path.is_absolute())
-    {
-        absolute_data_path = std::move(_data_path);
-        relative_data_path = std::filesystem::relative(absolute_data_path, cwd).lexically_normal();
-    }
-    else
-    {
-        relative_data_path = std::move(_data_path);
-        absolute_data_path = (cwd / relative_data_path).lexically_normal();
-    }
-
-    // webdav propfind max recurse depth
-    long _max_recurse_depth = ini.GetInteger("webdav", "max-recurse-depth", 4);
-    assert(std::in_range<int8_t>(_max_recurse_depth) && "[webdav.max-recurse-depth] Must be within the range of [0-255]");
-    max_recurse_depth = static_cast<int8_t>(_max_recurse_depth);
-
-    // webdav auth realm
-    realm = ini.GetString("webdav", "realm", "WebDavRealm");
-    assert(!realm.empty() && "[webdav.realm] Cannot be empty");
-
-    // webdav verification type
-    verification = ini.GetString("wevdav", "verification", "none");
-    assert((verification == "basic" || verification == "digest") &&
-           "[webdav.verification] Must be one of them [basic|digest]");
-
-    // webdav user list
-    const std::string user_list_raw = ini.GetString("webdav", "users", "");
-    for (const auto& user : utils::string::split(user_list_raw, ','))
-    {
-        users.emplace(utils::string::split2pair(user, '@'));
-    }
-}
-
-inline void ParseRedisConfig(const INIReader& ini, std::string& host, uint16_t& port, std::string& user, std::string& passwd)
-{
-    // redis address
-    host = ini.GetString("redis", "host", "localhost");
-
-    // redis port
-    long redis_port = ini.GetInteger("redis", "port", 6379);
-    assert(std::in_range<uint16_t>(redis_port) && "redis port number out of range");
-    port = static_cast<uint16_t>(redis_port);
-
-    // redis user
-    user = ini.GetString("redis", "username", "");
-    assert(!user.empty() && "[redis.username] Cannot be empty");
-
-    // redis password
-    passwd = ini.GetString("redis", "password", "");
-    assert(!passwd.empty() && "[redis.password] Cannot be empty");
-}
-
-inline void ParseEngineConfig(const INIReader& ini, std::string& etag_engine, std::string& prop_engine)
-{
-    std::unordered_set<std::string> engine_list{"memory", "sqlite", "redis"};
-
-    etag_engine = ini.GetString("engine", "etag", "sqlite");
-    assert(engine_list.contains(etag_engine) && "[engine.etag] Must be one of them [memory|sqlite|redis]");
-
-    prop_engine = ini.GetString("engine", "prop", "sqlite");
-    assert(engine_list.contains(prop_engine) && "[engine.prop] Must be one of them [memory|sqlite|redis]");
-}
-
-inline void ParseCacheConfig(const INIReader& ini, std::filesystem::path& sqlite_db, std::filesystem::path& etag_data,
-                                    std::filesystem::path& prop_data)
-{
-    sqlite_db = ini.GetString("cache", "sqlite-db", "./data.db");
-    etag_data = ini.GetString("cache", "etag-data", "./etag.dat");
-    prop_data = ini.GetString("cache", "prop-data", "./prop.dat");
-}
-
-void ConfigReader::WriteDefaultConfigFile(const std::filesystem::path& file)
-{
-    LOG_WARN("unable to read configuration file, creating ...")
-
-    std::ofstream ofs(file, std::ios::out);
-    if (!ofs.is_open())
-    {
-        LOG_ERROR("unable to write default configuration file, please check program permissions and try again.")
-        return;
-    }
-
-    ofs << "[http]\n";
-    ofs << "host = 127.0.0.1\n";
-    ofs << "address = 0.0.0.0\n";
-    ofs << "port = 8110\n";
-    ofs << "buffer_size = 1024\n";
-    ofs << "max_thread = 0\n";
-    ofs << '\n';
-
-    ofs << "[https]\n";
-    ofs << "enable = false\n";
-    ofs << "port = 8111\n";
-    ofs << "https-only = true\n";
-    ofs << "cert =./full_chain.pem\n";
-    ofs << "key =./key.pem\n";
-    ofs << '\n';
-
-    ofs << "[webdav]\n";
-    ofs << "data-path = ./data\n";
-    ofs << "max-recurse-depth = 4\n";
-    ofs << "realm = WebDavRealm\n";
-    ofs << "verification = none\n";
-    ofs << "users = test@admin\n";
-    ofs << '\n';
-
-    ofs << "[redis]\n";
-    ofs << "host = localhost\n";
-    ofs << "port = 6379\n";
-    ofs << "username = default\n";
-    ofs << "password =\n";
-    ofs << '\n';
-
-    ofs << "[engine]\n";
-    ofs << "etag = sqlite\n";
-    ofs << "prop = sqlite\n";
-    ofs << '\n';
-
-    ofs << "[cache]\n";
-    ofs << "sqlite-db = ./data.db\n";
-    ofs << "etag-data = ./etag.dat\n";
-    ofs << "prop-data = ./prop.dat\n";
-
-    ofs.flush();
-    ofs.close();
-}
-
-const ConfigReader& ConfigReader::GetInstance()
-{
-    static ConfigReader instance{};
     return instance;
 }
 
-// NOLINTNEXTLINE
-ConfigReader::ConfigReader(const std::filesystem::path& path)
+inline void CheckHttpConfig(const HttpConfig& http_config)
+{
+    assert(!http_config.host.empty() && "[http.host] Illegal host");
+    assert(!http_config.address.empty() && "[http.address] Illegal address");
+    assert(std::in_range<uint16_t>(http_config.port) && "[http.port] Must be within the range of [0-65535]");
+    assert((http_config.buffer_size >= 1024) && "[http.buffer_size] Must be >= 1024");
+    assert(std::in_range<uint8_t>(http_config.max_thread) && "[http.max_thread] Must be within the range of [0-65535]");
+}
+
+inline void CheckHttpsConfig(const HttpsConfig& https_config)
+{
+    assert(std::in_range<uint16_t>(https_config.port) && "[https.port] Must be within the range of [0-65535]");
+    if (https_config.enable)
+    {
+        assert(std::filesystem::is_regular_file(https_config.cert) && "[ssl.cert] Not exist");
+        assert(std::filesystem::is_regular_file(https_config.key) && "[ssl.key] Not exist");
+    }
+}
+
+inline void CheckWebDavConfig(const WebDavConfig& webdav_config, std::filesystem::path& abs_path, std::filesystem::path& rel_path,
+                              std::string& route_prefix)
+{
+
+    assert(!webdav_config.prefix.empty() && "[webdav.prefix] Cannot be empty");
+    {
+        const char c = webdav_config.prefix.back();
+        assert((c >= 65 && c <= 90) || (c >= 97 && c <= 122) && "[webdav.prefix] Must end with the [a-Z] character");
+    }
+    assert(std::filesystem::exists(webdav_config.data_path) && "[webdav.data_path] Not exist");
+    assert(std::filesystem::is_directory(webdav_config.data_path) && "[webdav.data_path] Required directory");
+
+    {
+        if (std::filesystem::path data_path = webdav_config.data_path; data_path.is_absolute())
+        {
+            abs_path = std::move(data_path);
+            rel_path = std::filesystem::relative(abs_path, std::filesystem::current_path()).lexically_normal();
+        }
+        else
+        {
+            rel_path = std::move(data_path);
+            abs_path = (std::filesystem::current_path() / rel_path).lexically_normal();
+        }
+    }
+
+    assert(std::in_range<int8_t>(webdav_config.max_recurse_depth) && "[webdav.max_recurse_depth] Must be within the range of [0-255]");
+    assert(!webdav_config.realm.empty() && "[webdav.realm] Cannot be empty");
+    assert((webdav_config.verification == "basic" || webdav_config.verification == "digest") &&
+           "[webdav.verification] Must be one of them [basic|digest]");
+    for (const auto& user : webdav_config.users)
+    {
+        assert(!user.name.empty() && "[webdav.users.name] Cannot be empty");
+        assert(!user.password.empty() && "[webdav.users.password] Cannot be empty");
+    }
+    route_prefix = webdav_config.prefix + "/(.*)";
+}
+
+inline void CheckRedisConfig(const RedisConfig& redis_config)
+{
+    assert(!redis_config.host.empty() && "[redis.host] Cannot be empty");
+    assert(std::in_range<uint16_t>(redis_config.port) && "[redis.port] Must be within the range of [0-65535]");
+    assert(!redis_config.username.empty() && "[redis.username] Cannot be empty");
+    assert(!redis_config.password.empty() && "[redis.password] Cannot be empty");
+}
+
+inline void CheckEngineConfig(const EngineConfig& engine_config)
+{
+    std::unordered_set<std::string> engine_list{"memory", "sqlite", "redis"};
+    assert(engine_list.contains(engine_config.etag) && "[engine.etag] Must be one of them [memory|sqlite|redis]");
+    assert(engine_list.contains(engine_config.prop) && "[engine.prop] Must be one of them [memory|sqlite|redis]");
+}
+
+ConfigManager::ConfigManager(const std::filesystem::path& config_file_path) : config_file_path_(config_file_path)
 {
     namespace fs = std::filesystem;
 
-    std::string path_string = utils::path::to_string(path);
-    if (!fs::exists(path_string))
+    if (!fs::exists(config_file_path))
     {
-        WriteDefaultConfigFile(path);
-        LOG_INFO("Default configuration has been generated, please restart the server.")
+        CreateDefaultConfig();
+        throw std::runtime_error("Default config file created, please modify it before running the program.");
     }
 
-    const INIReader reader(path_string);
-    assert(reader.ParseError() == 0 && "Failed to parsing settings.ini");
-    cwd_ = fs::current_path();
+    LoadConfig(config_file_path);
 
-    ParseHttpConfig(reader, http_host_, http_address_, http_port_, http_buffer_size_, http_max_thread_);
+    // Check HttpConfig
+    CheckHttpConfig(config_.http);
 
-    ParseHttpsConfig(reader, https_enable_, https_port_, https_only_, ssl_cert_, ssl_key_);
+    // Check HttpsConfig
+    CheckHttpsConfig(config_.https);
 
-    ParseWebDAVConfig(reader, webdav_prefix_, webdav_route_prefix_, webdav_absolute_data_path_, webdav_relative_data_path_, webdav_max_recurse_depth_,
-                      webdav_realm_, webdav_verification_, webdav_user_);
+    // Check WebDavConfig
+    CheckWebDavConfig(config_.webdav, absolute_webdav_data_path_, relative_webdav_data_path_, webdav_prefix_);
 
-    ParseRedisConfig(reader, redis_host_, redis_port_, redis_username_, redis_password_);
+    // Check RedisConfig
+    CheckRedisConfig(config_.redis);
 
-    ParseEngineConfig(reader, etag_engine_, prop_engine_);
+    // Check EngineConfig
+    CheckEngineConfig(config_.engine);
 
-    ParseCacheConfig(reader, sqlite_db_, etag_data_, prop_data_);
+    // The engine will create DataConfig, so it is not checked here.
 }
 
-const std::filesystem::path& ConfigReader::GetCWD() const noexcept
+void ConfigManager::SaveConfig() const
 {
-    return cwd_;
+    std::ofstream file(config_file_path_, std::ios::out | std::ios::trunc);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Failed to open " + config_file_path_.string());
+    }
+
+    std::string buffer;
+    iguana::to_json(config_, buffer);
+    file << buffer;
+    file.close();
 }
 
-const std::string& ConfigReader::GetHttpHost() const noexcept
+void ConfigManager::LoadConfig(const std::filesystem::path& config_file_path)
 {
-    return http_host_;
+    std::ifstream file(config_file_path);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Failed to open " + config_file_path.string());
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    file.close();
+
+    iguana::from_json(config_, buffer.str());
 }
 
-const std::string& ConfigReader::GetHttpAddress() const noexcept
+void ConfigManager::ReloadConfig()
 {
-    return http_address_;
+    config_ = Config{};
+    LoadConfig(config_file_path_);
 }
 
-uint16_t ConfigReader::GetHttpPort() const noexcept
+const Config& ConfigManager::GetGlobalConfig() const noexcept
 {
-    return http_port_;
+    return config_;
 }
 
-uint16_t ConfigReader::GetHttpMaxThread() const noexcept
+const HttpConfig& ConfigManager::GetHttpConfig() const noexcept
 {
-    return http_max_thread_;
+    return config_.http;
 }
 
-size_t ConfigReader::GetHttpBufferSize() const noexcept
+const HttpsConfig& ConfigManager::GetHttpsConfig() const noexcept
 {
-    return http_buffer_size_;
+    return config_.https;
 }
 
-bool ConfigReader::GetHttpsEnabled() const noexcept
+const WebDavConfig& ConfigManager::GetWebDavConfig() const noexcept
 {
-    return https_enable_;
+    return config_.webdav;
 }
 
-uint16_t ConfigReader::GetHttpsPort() const noexcept
+const RedisConfig& ConfigManager::GetRedisConfig() const noexcept
 {
-    return https_port_;
+    return config_.redis;
 }
 
-bool ConfigReader::GetHttpsOnly() const noexcept
+const EngineConfig& ConfigManager::GetEngineConfig() const noexcept
 {
-    return https_only_;
+    return config_.engine;
 }
 
-const std::filesystem::path& ConfigReader::GetSSLCertPath() const noexcept
+const DataConfig& ConfigManager::GetDataConfig() const noexcept
 {
-    return ssl_cert_;
+    return config_.data;
 }
 
-const std::filesystem::path& ConfigReader::GetSSLKeyPath() const noexcept
+void ConfigManager::CreateDefaultConfig() const
 {
-    return ssl_key_;
+    if (std::filesystem::exists(config_file_path_))
+    {
+        return;
+    }
+
+    Config config;
+    config.http.host = "127.0.0.1";
+    config.http.address = "0.0.0.0";
+    config.http.port = 8110;
+    config.http.buffer_size = 1024;
+    config.http.max_thread = 0;
+
+    config.https.enable = false;
+    config.https.port = 8111;
+    config.https.https_only = false;
+    config.https.cert = "fullchain.pem";
+    config.https.key = "privkey.pem";
+
+    config.webdav.prefix = "/webdav";
+    config.webdav.data_path = "./data";
+    config.webdav.max_recurse_depth = 4;
+    config.webdav.realm = "WEBDAV_REALM";
+    config.webdav.verification = "basic";
+    config.webdav.users.emplace_back("test", "passw0rd");
+
+    config.redis.host = "127.0.0.1";
+    config.redis.port = 6379;
+    config.redis.username = "";
+    config.redis.password = "";
+
+    config.engine.etag = "sqlite";
+    config.engine.prop = "sqlite";
+
+    config.data.sqlite_db = "./metadata/data.db";
+    config.data.etag_data = "./metadata/etag.db";
+    config.data.prop_data = "./metadata/prop.db";
+
+    std::ofstream file(config_file_path_, std::ios::out | std::ios::trunc);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Failed to open " + config_file_path_.string());
+    }
+
+    std::string buffer;
+    iguana::to_json(config, buffer);
+    file << buffer;
+    file.close();
 }
 
-const std::string& ConfigReader::GetWebDavPrefix() const noexcept
+const std::string& ConfigManager::GetHttpHost() const noexcept
 {
-    return webdav_prefix_;
+    return config_.http.host;
 }
 
-const std::string& ConfigReader::GetWebDavRoutePrefix() const noexcept
+const std::string& ConfigManager::GetHttpAddress() const noexcept
 {
-    return webdav_route_prefix_;
+    return config_.http.address;
 }
 
-const std::filesystem::path& ConfigReader::GetWebDavRelativeDataPath() const noexcept
+uint16_t ConfigManager::GetHttpPort() const noexcept
 {
-    return webdav_relative_data_path_;
+    return static_cast<uint16_t>(config_.http.port);
 }
 
-std::filesystem::path ConfigReader::GetWebDavRelativeDataPath(std::string_view url) const noexcept
+uint16_t ConfigManager::GetHttpMaxThread() const noexcept
 {
-    return std::filesystem::relative(GetWebDavAbsoluteDataPath(url), cwd_);
+    return static_cast<uint16_t>(config_.http.max_thread);
 }
 
-const std::filesystem::path& ConfigReader::GetWebDavAbsoluteDataPath() const noexcept
+size_t ConfigManager::GetHttpBufferSize() const noexcept
 {
-    return webdav_absolute_data_path_;
+    return config_.http.buffer_size;
 }
 
-std::filesystem::path ConfigReader::GetWebDavAbsoluteDataPath(std::string_view url) const noexcept
+bool ConfigManager::GetHttpsEnabled() const noexcept
+{
+    return config_.https.enable;
+}
+
+uint16_t ConfigManager::GetHttpsPort() const noexcept
+{
+    return static_cast<uint16_t>(config_.https.port);
+}
+
+bool ConfigManager::GetHttpsOnly() const noexcept
+{
+    return config_.https.https_only;
+}
+
+const std::filesystem::path& ConfigManager::GetSSLCertPath() const noexcept
+{
+    static std::filesystem::path cert_path = config_.https.cert;
+    return cert_path;
+}
+
+const std::filesystem::path& ConfigManager::GetSSLKeyPath() const noexcept
+{
+    static std::filesystem::path key_path = config_.https.key;
+    return key_path;
+}
+
+const std::string& ConfigManager::GetWebDavPrefix() const noexcept
+{
+    return config_.webdav.prefix;
+}
+
+const std::string& ConfigManager::GetWebDavRoutePrefix() const noexcept
+{
+    return route_prefix_;
+}
+
+const std::filesystem::path& ConfigManager::GetWebDavRelativeDataPath() const noexcept
+{
+    return relative_webdav_data_path_;
+}
+
+std::filesystem::path ConfigManager::GetWebDavRelativeDataPath(std::string_view url) const noexcept
+{
+    return relative(GetWebDavAbsoluteDataPath(url), std::filesystem::current_path());
+}
+
+const std::filesystem::path& ConfigManager::GetWebDavAbsoluteDataPath() const noexcept
+{
+    return absolute_webdav_data_path_;
+}
+
+std::filesystem::path ConfigManager::GetWebDavAbsoluteDataPath(std::string_view url) const noexcept
 {
     namespace fs = std::filesystem;
 
     if (url == webdav_prefix_)
     {
-        return webdav_absolute_data_path_;
+        return absolute_webdav_data_path_;
     }
 
     if (url.starts_with(webdav_prefix_))
@@ -349,14 +334,15 @@ std::filesystem::path ConfigReader::GetWebDavAbsoluteDataPath(std::string_view u
         url = url.substr(webdav_prefix_.size());
     }
 
-    fs::path res = webdav_absolute_data_path_ / url;
+    fs::path res = absolute_webdav_data_path_ / url;
     res = res.lexically_normal();
     // Escape from resource directory?
     {
-        const auto path = fs::relative(res, webdav_absolute_data_path_);
-        if (auto path_str = utils::path::to_string(path); path_str.starts_with(".."))
+        fs::path path = fs::relative(res, absolute_webdav_data_path_);
+        std::string path_str = path.string();
+        if (path_str.starts_with(".."))
         {
-            LOG_WARN_FMT("Discovery of escape behavior from resource directory!\nTo: {}", path_str);
+            // LOG_WARN_FMT("Discovery of escape behavior from resource directory!\nTo: {}", path_str);
             return {""};
         }
     }
@@ -364,73 +350,77 @@ std::filesystem::path ConfigReader::GetWebDavAbsoluteDataPath(std::string_view u
     return res;
 }
 
-int8_t ConfigReader::GetWebDavMaxRecurseDepth() const noexcept
+int8_t ConfigManager::GetWebDavMaxRecurseDepth() const noexcept
 {
-    return webdav_max_recurse_depth_;
+    return static_cast<int8_t>(config_.webdav.max_recurse_depth);
 }
 
-const std::string& ConfigReader::GetWebDavRealm() const noexcept
+const std::string& ConfigManager::GetWebDavRealm() const noexcept
 {
-    return webdav_realm_;
+    return config_.webdav.realm;
 }
 
-const std::string& ConfigReader::GetWebDavVerification() const noexcept
+const std::string& ConfigManager::GetWebDavVerification() const noexcept
 {
-    return webdav_verification_;
+    return config_.webdav.verification;
 }
 
-std::string ConfigReader::GetWebDavUser(const std::string& user) const noexcept
+auto ConfigManager::GetWebDavUser(const std::string& user) const noexcept -> std::optional<WebDavUser>
 {
-    const auto& it = webdav_user_.find(user);
-    if (it == webdav_user_.end())
+    for (const auto& u : config_.webdav.users)
     {
-        return {""};
+        if (u.name == user)
+        {
+            return u;
+        }
     }
-
-    return it->second;
+    return std::nullopt;
 }
 
-const std::string& ConfigReader::GetRedisHost() const noexcept
+const std::string& ConfigManager::GetRedisHost() const noexcept
 {
-    return redis_host_;
+    return config_.redis.host;
 }
 
-uint16_t ConfigReader::GetRedisPort() const noexcept
+uint16_t ConfigManager::GetRedisPort() const noexcept
 {
-    return redis_port_;
+    return static_cast<uint16_t>(config_.redis.port);
 }
 
-const std::string& ConfigReader::GetRedisUserName() const noexcept
+const std::string& ConfigManager::GetRedisUserName() const noexcept
 {
-    return redis_username_;
+    return config_.redis.username;
 }
 
-const std::string& ConfigReader::GetRedisPassword() const noexcept
+const std::string& ConfigManager::GetRedisPassword() const noexcept
 {
-    return redis_password_;
+    return config_.redis.password;
 }
 
-const std::string& ConfigReader::GetETagEngine() const noexcept
+const std::string& ConfigManager::GetETagEngine() const noexcept
 {
-    return etag_engine_;
+    return config_.engine.etag;
 }
 
-const std::string& ConfigReader::GetPropEngine() const noexcept
+const std::string& ConfigManager::GetPropEngine() const noexcept
 {
-    return prop_engine_;
+    return config_.engine.prop;
 }
 
-const std::filesystem::path& ConfigReader::GetSQLiteDB() const noexcept
+const std::filesystem::path& ConfigManager::GetSQLiteDB() const noexcept
 {
-    return sqlite_db_;
+    static std::filesystem::path path = config_.data.sqlite_db;
+    return path;
 }
 
-const std::filesystem::path& ConfigReader::GetETagData() const noexcept
+const std::filesystem::path& ConfigManager::GetETagData() const noexcept
 {
-    return etag_data_;
+    static std::filesystem::path path = config_.data.etag_data;
+    return path;
 }
 
-const std::filesystem::path& ConfigReader::GetPropData() const noexcept
+const std::filesystem::path& ConfigManager::GetPropData() const noexcept
 {
-    return prop_data_;
+    static std::filesystem::path path = config_.data.prop_data;
+    return path;
 }

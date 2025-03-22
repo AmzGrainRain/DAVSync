@@ -1,9 +1,8 @@
 #include "delete.h"
 #include <exception>
 #include <filesystem>
-#include <iostream>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "http_exceptions.hpp"
 #include "services/FileLockService.h"
 #include "logger.hpp"
@@ -14,7 +13,7 @@ namespace Routes::WebDAV
 void DEL(cinatra::coro_http_request& req, cinatra::coro_http_response& res)
 {
     namespace fs = std::filesystem;
-    static const auto& conf = ConfigReader::GetInstance();
+    static const auto& conf = ConfigManager::GetInstance();
 
     try
     {

@@ -6,7 +6,7 @@
 
 #include <vector>
 
-#include "ConfigReader.h"
+#include "ConfigManager.h"
 #include "FilePropService.h"
 #include "logger.hpp"
 #include "utils/path.h"
@@ -21,7 +21,7 @@ SQLiteFilePropService::SQLiteFilePropService() noexcept(false)
 {
     using namespace ormpp;
 
-    if (const auto& conf = ConfigReader::GetInstance(); !dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "FileProp"))
+    if (const auto& conf = ConfigManager::GetInstance(); !dbng_.connect(utils::path::to_string(conf.GetSQLiteDB()).data(), "FileProp"))
     {
         throw std::runtime_error(dbng_.get_last_error());
     }
