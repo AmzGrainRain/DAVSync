@@ -83,8 +83,8 @@ TEST(TestConfigManager, GetRedisConfig)
 
     EXPECT_EQ(redis_config.host, "127.0.0.1");
     EXPECT_EQ(redis_config.port, 6379);
-    EXPECT_EQ(redis_config.username, "");
-    EXPECT_EQ(redis_config.password, "");
+    EXPECT_EQ(redis_config.username, "test");
+    EXPECT_EQ(redis_config.password, "test");
 }
 
 TEST(TestConfigManager, GetEngineConfig)

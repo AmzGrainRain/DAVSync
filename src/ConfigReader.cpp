@@ -221,8 +221,8 @@ void ConfigManager::CreateDefaultConfig() const
 
     config.redis.host = "127.0.0.1";
     config.redis.port = 6379;
-    config.redis.username = "";
-    config.redis.password = "";
+    config.redis.username = "test";
+    config.redis.password = "test";
 
     config.engine.etag = "sqlite";
     config.engine.prop = "sqlite";
